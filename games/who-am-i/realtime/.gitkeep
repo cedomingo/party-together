@@ -1,0 +1,5 @@
+Placeholder directory for Who Am I? Realtime channel handlers:
+  - broadcastEvents.ts   (active-turn indicator, "player is typing", sequential
+                          answer prompts, "I'm Done" events — scoped to this
+                          game's channel namespace, per SPEC.md §9)
+Populated when the game module is built.
