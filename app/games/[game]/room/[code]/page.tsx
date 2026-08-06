@@ -12,7 +12,6 @@
 //     via /lib/games-registry.ts so this file stays game-agnostic)
 
 import type { Metadata } from "next";
-import { getGameConfig } from "@/lib/games-registry";
 import { RoomClient } from "./RoomClient";
 
 export const metadata: Metadata = {
@@ -25,12 +24,18 @@ export default async function RoomPage({
   params: Promise<{ game: string; code: string }>;
 }) {
   const { game, code } = await params;
-  const gameConfig = getGameConfig(game);
 
   // Room resolution, join-if-needed, and the live lobby all happen
   // client-side (see RoomClient) — reading `rooms`/`players` requires an
   // authenticated (anonymous) Supabase session, which can only be
   // established/persisted from a Client Component, Server Action, or Route
   // Handler, not a plain Server Component render.
-  return <RoomClient code={code} gameConfig={gameConfig} />;
+  //
+  // `game` (the URL slug) is passed down as a plain string, not a resolved
+  // GameConfig — GameConfig can carry a game-specific `onStart` function
+  // (see lib/games-registry.ts), and functions can't cross the Server
+  // Component -> Client Component boundary. RoomClient resolves the full
+  // config itself, client-side, via the registry — the same pattern
+  // already used there for `getGameRoomView`.
+  return <RoomClient code={code} game={game} />;
 }

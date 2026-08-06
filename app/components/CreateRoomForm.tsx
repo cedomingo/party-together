@@ -8,9 +8,9 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createRoom, RoomError } from "@/lib/rooms";
-import type { GameConfig } from "@/lib/games-registry";
+import type { GameSummary } from "@/lib/games-registry";
 
-export function CreateRoomForm({ games, fixedGameId }: { games: GameConfig[]; fixedGameId?: string }) {
+export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; fixedGameId?: string }) {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [gameId, setGameId] = useState(fixedGameId ?? games[0]?.id ?? "");

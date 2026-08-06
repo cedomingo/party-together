@@ -3,7 +3,7 @@
 // up new games — no game-specific code should ever be added directly to
 // this file (SPEC.md §3, §7).
 
-import { games } from "@/lib/games-registry";
+import { games, toGameSummary } from "@/lib/games-registry";
 import { CreateRoomForm } from "@/app/components/CreateRoomForm";
 import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 
@@ -14,7 +14,7 @@ export default function HomePage() {
       <p className="lede">Create a room, share the link, and play browser-based party games with friends.</p>
 
       <div className="two-up">
-        <CreateRoomForm games={games} />
+        <CreateRoomForm games={games.map(toGameSummary)} />
         <JoinRoomForm />
       </div>
 

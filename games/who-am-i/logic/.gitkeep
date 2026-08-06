@@ -1,5 +1,0 @@
-Placeholder directory for Who Am I? pure game logic (no React, no I/O):
-  - turnStateMachine.ts   (turn order, whose-turn-to-answer, "I'm Done" transitions)
-  - winCondition.ts       (all players guessed correctly / host ended game)
-  - assignCharacters.ts   (random no-repeat character assignment at game start)
-Populated when the game module is built.

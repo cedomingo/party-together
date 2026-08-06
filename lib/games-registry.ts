@@ -12,6 +12,7 @@
 // game by only adding a folder + a registry entry") are proving.
 
 import type { ComponentType } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Player, Room } from "@/lib/rooms";
 
 export interface GameConfig {
@@ -25,6 +26,34 @@ export interface GameConfig {
   maxPlayers: number;
   /** Path under /public to the thumbnail used in the game picker + OG image */
   thumbnailPath: string;
+  /**
+   * Optional game-specific replacement for the platform core's generic
+   * `startGame` (lib/rooms), run when the host presses "Start Game". Most
+   * games can omit this and get the generic status-flip stub. "Who Am I?"
+   * needs its own (SPEC.md §8 "Setup": random no-repeat character
+   * assignment has to happen as part of game start, via trusted server
+   * logic — see games/who-am-i/config.ts) — this is the extension point
+   * that lets it do that without RoomClient (platform core) ever knowing
+   * "Who Am I?" exists. Should throw on failure; RoomClient surfaces the
+   * error and leaves the room in `lobby`.
+   */
+  onStart?: (supabase: SupabaseClient, room: Room) => Promise<void>;
+}
+
+/**
+ * Serializable subset of GameConfig, safe to pass as a prop from a Server
+ * Component into a Client Component (e.g. the game picker on the landing
+ * page). `onStart` is a function — React can't serialize it across the
+ * server/client boundary, so anything that needs to actually call it (e.g.
+ * RoomClient) must resolve the full GameConfig itself, client-side, via
+ * `getGameConfig()` — the same pattern already used for `getGameRoomView`.
+ */
+export type GameSummary = Omit<GameConfig, "onStart">;
+
+export function toGameSummary(config: GameConfig): GameSummary {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit it
+  const { onStart, ...summary } = config;
+  return summary;
 }
 
 /**

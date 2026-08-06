@@ -167,3 +167,80 @@ button:disabled {
 .game-placeholder p:first-child {
   font-weight: 600;
 }
+
+/* "Who Am I?" — Setup & Board phase (SPEC.md §8 "Setup"). */
+.who-am-i-board {
+  margin-top: 0.5rem;
+}
+
+.who-am-i-board h2 {
+  margin: 0 0 0.35rem;
+}
+
+.who-am-i-grid {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.65rem;
+}
+
+.who-am-i-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+}
+
+.who-am-i-card-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.who-am-i-card-image img {
+  object-fit: cover;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.who-am-i-card-name {
+  font-size: 0.8rem;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.who-am-i-card.crossed-off {
+  opacity: 0.45;
+}
+
+.who-am-i-card.crossed-off .who-am-i-card-image {
+  filter: grayscale(1);
+}
+
+.who-am-i-card.crossed-off .who-am-i-card-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom right,
+    transparent calc(50% - 1.5px),
+    var(--danger) calc(50% - 1.5px),
+    var(--danger) calc(50% + 1.5px),
+    transparent calc(50% + 1.5px)
+  );
+}
+
+.who-am-i-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

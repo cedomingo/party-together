@@ -11,7 +11,7 @@
 //
 // Scaffolding only in Phase 0.
 
-import { getGameConfig } from "@/lib/games-registry";
+import { getGameConfig, toGameSummary } from "@/lib/games-registry";
 import { CreateRoomForm } from "@/app/components/CreateRoomForm";
 import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 
@@ -35,7 +35,7 @@ export default async function GameLandingPage({
             {config.minPlayers}–{config.maxPlayers} players
           </p>
           <div className="two-up">
-            <CreateRoomForm games={[config]} fixedGameId={config.id} />
+            <CreateRoomForm games={[toGameSummary(config)]} fixedGameId={config.id} />
             <JoinRoomForm />
           </div>
         </>

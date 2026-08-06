@@ -21,12 +21,18 @@ import {
   type Player,
   type Room,
 } from "@/lib/rooms";
-import { getGameRoomView, type GameConfig } from "@/lib/games-registry";
+import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
-export function RoomClient({ code, gameConfig }: { code: string; gameConfig: GameConfig | undefined }) {
+export function RoomClient({ code, game }: { code: string; game: string }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  // Resolved client-side, not passed down from the Server Component page —
+  // GameConfig can carry a game-specific `onStart` function (see
+  // lib/games-registry.ts), and functions can't cross the Server Component
+  // -> Client Component boundary. Same reasoning as `getGameRoomView` below.
+  const gameConfig = useMemo(() => getGameConfig(game), [game]);
 
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -197,12 +203,24 @@ export function RoomClient({ code, gameConfig }: { code: string; gameConfig: Gam
   async function handleStartGame() {
     if (!room) return;
     setStarting(true);
+    setErrorMessage(null);
     try {
-      await startGame(supabase, room.id);
+      // Games can register their own start behavior (see GameConfig.onStart
+      // in lib/games-registry.ts) — e.g. "Who Am I?" needs to assign
+      // characters as part of starting. This file never needs to know that;
+      // it just calls whatever the registry handed back, or falls back to
+      // the generic core stub for games that don't need anything special.
+      if (gameConfig?.onStart) {
+        await gameConfig.onStart(supabase, room);
+      } else {
+        await startGame(supabase, room.id);
+      }
       const fresh = await getRoomByCode(supabase, code);
       if (fresh) setRoom(fresh);
     } catch (err) {
-      setErrorMessage(err instanceof RoomError ? err.message : "Couldn't start the game.");
+      setErrorMessage(
+        err instanceof RoomError || err instanceof Error ? err.message : "Couldn't start the game."
+      );
     } finally {
       setStarting(false);
     }
