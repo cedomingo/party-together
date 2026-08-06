@@ -21,7 +21,6 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   ensureAnonSession,
   getRoomByCode,
-  joinRoomByCode,
   listPlayers,
   setPlayerConnected,
   startGame,
@@ -29,6 +28,7 @@ import {
   type Player,
   type Room,
 } from "@/lib/rooms";
+import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
@@ -197,7 +197,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     setJoining(true);
     setJoinError(null);
     try {
-      const result = await joinRoomByCode(supabase, code, joinNickname);
+      const result = await joinRoomByCodeViaApi(code, joinNickname);
       const freshRoom = await getRoomByCode(supabase, code);
       if (freshRoom) setRoom(freshRoom);
       await refreshPlayers(result.roomId);

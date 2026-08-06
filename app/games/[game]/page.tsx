@@ -3,82 +3,45 @@
 // search, as opposed to the live room pages under /room/[code] which are
 // noindex (see app/games/[game]/room/[code]/page.tsx).
 //
-// Driven entirely by that game's GameConfig (SPEC.md §4):
-//   - 404s via notFound() when the slug isn't a registered game
-//   - per-game <title>/description/OG/Twitter tags via `generateMetadata`
-//   - on-page marketing copy + a "Create Room" CTA for this game
+// Once games are registered in /lib/games-registry.ts, this page will:
+//   - call getGameConfig(params.game) and 404 if not found
+//   - generate per-game <title>/description/OG tags via `generateMetadata`,
+//     driven entirely by that game's GameConfig (§4 of SPEC.md)
+//   - render on-page marketing copy + a "Create Room" CTA for this game
+//
+// Scaffolding only in Phase 0.
 
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { games, getGameConfig, toGameSummary } from "@/lib/games-registry";
+import { getGameConfig, toGameSummary } from "@/lib/games-registry";
 import { CreateRoomForm } from "@/app/components/CreateRoomForm";
 import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://partytogether.com";
-
-type GameLandingPageProps = {
-  params: Promise<{ game: string }>;
-};
-
-export async function generateMetadata({
+export default async function GameLandingPage({
   params,
-}: GameLandingPageProps): Promise<Metadata> {
+}: {
+  params: Promise<{ game: string }>;
+}) {
   const { game } = await params;
   const config = getGameConfig(game);
 
-  // Let the page itself 404 (via notFound() below) rather than duplicating
-  // the "unknown game" branch here — an empty object just falls back to the
-  // root layout's default metadata for the 404 render.
-  if (!config) return {};
-
-  const url = `${siteUrl}/games/${config.id}`;
-  const thumbnailUrl = `${siteUrl}${config.thumbnailPath}`;
-
-  return {
-    title: config.displayName,
-    description: config.description,
-    alternates: { canonical: url },
-    openGraph: {
-      title: config.displayName,
-      description: config.description,
-      url,
-      siteName: "Party Together",
-      images: [{ url: thumbnailUrl }],
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: config.displayName,
-      description: config.description,
-      images: [thumbnailUrl],
-    },
-  };
-}
-
-// New games automatically get a static path (and therefore a build-time
-// prerendered landing page) purely by being added to the registry — no
-// change needed here.
-export function generateStaticParams() {
-  return games.map((g) => ({ game: g.id }));
-}
-
-export default async function GameLandingPage({ params }: GameLandingPageProps) {
-  const { game } = await params;
-  const config = getGameConfig(game);
-
-  if (!config) notFound();
-
+  // TODO(seo-phase): notFound() when config is undefined once games exist;
+  // TODO(seo-phase): generateMetadata() driven by `config` per §4.
   return (
     <main className="page">
-      <h1>{config.displayName}</h1>
-      <p className="lede">{config.description}</p>
-      <p className="muted">
-        {config.minPlayers}–{config.maxPlayers} players
-      </p>
-      <div className="two-up">
-        <CreateRoomForm games={[toGameSummary(config)]} fixedGameId={config.id} />
-        <JoinRoomForm />
-      </div>
+      <h1>{config?.displayName ?? game}</h1>
+      {config ? (
+        <>
+          <p className="lede">{config.description}</p>
+          <p className="muted">
+            {config.minPlayers}–{config.maxPlayers} players
+          </p>
+          <div className="two-up">
+            <CreateRoomForm games={[toGameSummary(config)]} fixedGameId={config.id} />
+            <JoinRoomForm />
+          </div>
+        </>
+      ) : (
+        <p>Game landing page placeholder — Phase 0 scaffolding.</p>
+      )}
     </main>
   );
 }

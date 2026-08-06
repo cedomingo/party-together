@@ -20,6 +20,14 @@ import {
   saveTurnState,
 } from "@/app/api/games/who-am-i/_lib/turnSession";
 import { TurnStateError, advanceAfterAnswer, currentResponderId } from "@/games/who-am-i/logic/turnState";
+import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
+
+// SPEC.md §10: "rate-limit ... answer submissions server-side ... to
+// prevent spam-turn abuse." Same reasoning as question/route.ts — keyed by
+// player, backstop behind the responder-order check below, not a
+// replacement for it.
+const LIMIT = 20;
+const WINDOW_SECONDS = 60;
 
 type AnswerValue = "yes" | "no";
 
@@ -45,6 +53,12 @@ export async function POST(request: Request) {
 
   try {
     const { supabase, callerPlayerId, state } = await loadSessionForTurn(sessionId);
+
+    await enforceRateLimit({
+      key: `who-am-i-answer:${callerPlayerId}`,
+      limit: LIMIT,
+      windowSeconds: WINDOW_SECONDS,
+    });
 
     if (currentResponderId(state) !== callerPlayerId) {
       return NextResponse.json(
@@ -100,6 +114,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ state: nextState });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 429, headers: { "Retry-After": String(err.retryAfterSeconds) } }
+      );
+    }
     if (err instanceof TurnRequestError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }

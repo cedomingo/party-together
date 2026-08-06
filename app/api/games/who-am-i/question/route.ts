@@ -20,17 +20,28 @@ import {
   saveTurnState,
 } from "@/app/api/games/who-am-i/_lib/turnSession";
 import { TurnStateError, currentAskerId, startAnswering } from "@/games/who-am-i/logic/turnState";
+import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
+import { stripUnsafeChars } from "@/lib/rooms";
 
 const MAX_QUESTION_LENGTH = 280;
 
+// SPEC.md §10: "rate-limit question submissions ... server-side ... to
+// prevent spam-turn abuse." Keyed by player, not IP — the turn loop
+// already only lets one player ask at a time, so this is purely a backstop
+// against a single (possibly compromised/scripted) session hammering the
+// endpoint, not a substitute for the turn-order check below.
+const LIMIT = 10;
+const WINDOW_SECONDS = 60;
+
 /**
- * Same sanitization spirit as `sanitizeNickname` in lib/rooms: strip angle
- * brackets, collapse whitespace, trim, and fail fast with a friendly error
- * before ever hitting the DB's own `question_text` check constraint
+ * Same sanitization as `sanitizeNickname` in lib/rooms (shares
+ * `stripUnsafeChars`): strip angle brackets/control/zero-width chars,
+ * collapse whitespace, trim, and fail fast with a friendly error before
+ * ever hitting the DB's own `question_text` check constraint
  * (supabase/migrations/20260806120200_game_tables.sql).
  */
 function sanitizeQuestionText(raw: string): string {
-  const stripped = raw.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_QUESTION_LENGTH);
+  const stripped = stripUnsafeChars(raw).replace(/\s+/g, " ").trim().slice(0, MAX_QUESTION_LENGTH);
   if (stripped.length < 1) {
     throw new TurnRequestError("Question must be between 1 and 280 characters.", 400);
   }
@@ -56,6 +67,12 @@ export async function POST(request: Request) {
   try {
     const cleanQuestion = sanitizeQuestionText(questionText);
     const { supabase, callerPlayerId, state } = await loadSessionForTurn(sessionId);
+
+    await enforceRateLimit({
+      key: `who-am-i-question:${callerPlayerId}`,
+      limit: LIMIT,
+      windowSeconds: WINDOW_SECONDS,
+    });
 
     if (currentAskerId(state) !== callerPlayerId) {
       return NextResponse.json({ error: "It isn't your turn to ask a question." }, { status: 403 });
@@ -83,6 +100,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ questionId: questionRow.id, state: nextState });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 429, headers: { "Retry-After": String(err.retryAfterSeconds) } }
+      );
+    }
     if (err instanceof TurnRequestError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }

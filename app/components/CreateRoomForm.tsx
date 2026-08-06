@@ -6,8 +6,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createRoom, RoomError } from "@/lib/rooms";
+import { RoomError } from "@/lib/rooms";
+import { createRoomViaApi } from "@/lib/rooms/client";
 import type { GameSummary } from "@/lib/games-registry";
 
 export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; fixedGameId?: string }) {
@@ -27,10 +27,8 @@ export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; f
     setLoading(true);
     setError(null);
     try {
-      const supabase = createSupabaseBrowserClient();
       const parsedMax = maxPlayers.trim() ? Number(maxPlayers) : null;
-      const { code } = await createRoom({
-        supabase,
+      const { code } = await createRoomViaApi({
         gameId,
         nickname,
         maxPlayers: parsedMax && parsedMax > 0 ? parsedMax : null,

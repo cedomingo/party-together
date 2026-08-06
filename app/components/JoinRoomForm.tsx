@@ -4,8 +4,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { joinRoomByCode, RoomError } from "@/lib/rooms";
+import { RoomError } from "@/lib/rooms";
+import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 
 export function JoinRoomForm({ fixedCode }: { fixedCode?: string } = {}) {
   const router = useRouter();
@@ -19,8 +19,7 @@ export function JoinRoomForm({ fixedCode }: { fixedCode?: string } = {}) {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createSupabaseBrowserClient();
-      const result = await joinRoomByCode(supabase, code, nickname);
+      const result = await joinRoomByCodeViaApi(code, nickname);
       router.push(`/games/${result.gameId}/room/${result.code}`);
     } catch (err) {
       setError(err instanceof RoomError ? err.message : "Something went wrong joining the room.");

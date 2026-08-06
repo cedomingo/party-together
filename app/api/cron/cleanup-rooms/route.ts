@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { cleanupExpiredRooms } from "@/lib/rooms";
+import { cleanupStaleRateLimits } from "@/lib/rateLimit";
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -23,7 +24,13 @@ async function handle(request: Request) {
 
   const supabaseAdmin = createSupabaseAdminClient();
   const result = await cleanupExpiredRooms(supabaseAdmin);
-  return NextResponse.json(result);
+  // Piggyback the rate-limit table's own housekeeping (SPEC.md §10) on this
+  // existing cron rather than standing up a second scheduled job — see
+  // lib/rateLimit.ts. Best-effort: a failure here shouldn't fail room
+  // cleanup, which is why cleanupStaleRateLimits already swallows its own
+  // errors internally.
+  const rateLimitRowsDeleted = await cleanupStaleRateLimits(supabaseAdmin);
+  return NextResponse.json({ ...result, rateLimitRowsDeleted });
 }
 
 export const GET = handle;

@@ -77,15 +77,32 @@ export function normalizeRoomCode(code: string): string {
 }
 
 /**
- * Trims, collapses whitespace, strips angle brackets, and enforces the
- * length window the DB also enforces (SPEC.md §10: "basic input
- * sanitization/length limits on nicknames ... to prevent XSS and abuse").
- * The DB check constraint is the real backstop; this just fails fast with a
- * friendlier error and a consistent shape before it ever reaches Postgres.
+ * Strips characters no legitimate nickname/question needs and that are
+ * classic abuse vectors: angle brackets (keeps raw `<script>`-shaped
+ * strings out of stored data — defense in depth, since these are only
+ * ever rendered as React text content, which already escapes everything),
+ * C0/C1 control characters (NUL and friends), and zero-width/bidi-override
+ * characters (used to spoof or obscure displayed text). Shared by
+ * `sanitizeNickname` here and `sanitizeQuestionText` in
+ * app/api/games/who-am-i/question/route.ts (SPEC.md §10).
+ */
+export function stripUnsafeChars(raw: string): string {
+  return raw
+    .replace(/[<>]/g, "")
+    // eslint-disable-next-line no-control-regex -- intentionally matching control/zero-width chars to strip them
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\uFEFF]/g, "");
+}
+
+/**
+ * Trims, collapses whitespace, strips unsafe characters (see
+ * `stripUnsafeChars`), and enforces the length window the DB also enforces
+ * (SPEC.md §10: "basic input sanitization/length limits on nicknames ...
+ * to prevent XSS and abuse"). The DB check constraint is the real
+ * backstop; this just fails fast with a friendlier error and a consistent
+ * shape before it ever reaches Postgres.
  */
 export function sanitizeNickname(raw: string): string {
-  const stripped = raw
-    .replace(/[<>]/g, "")
+  const stripped = stripUnsafeChars(raw)
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, NICKNAME_MAX_LENGTH);
