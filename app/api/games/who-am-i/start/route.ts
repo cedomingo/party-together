@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assignCharacters, AssignmentError } from "@/games/who-am-i/logic/assignCharacters";
+import { initialTurnState } from "@/games/who-am-i/logic/turnState";
 
 export async function POST(request: Request) {
   let body: { roomId?: unknown };
@@ -79,11 +80,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only the host can start the game." }, { status: 403 });
   }
 
+  // Ordered by join order — this doubles as turnOrder below (SPEC.md §8
+  // point 1: "join order or randomized"; join order is simpler to reason
+  // about and keeps "who's up next" predictable for players watching the
+  // lobby fill up).
   const { data: connectedPlayers, error: playersError } = await supabase
     .from("players")
     .select("id")
     .eq("room_id", roomId)
-    .eq("connected", true);
+    .eq("connected", true)
+    .order("joined_at", { ascending: true });
 
   if (playersError) {
     return NextResponse.json({ error: playersError.message }, { status: 500 });
@@ -122,9 +128,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Turn order + turn loop state (SPEC.md §8 "Turn Loop") lives in this
+  // session's `state` jsonb from the moment it's created — see
+  // games/who-am-i/logic/turnState.ts for the shape and every transition
+  // out of it. playerIds here is already join-ordered (see query above),
+  // so it's used directly as turnOrder rather than reshuffled.
   const { data: sessionRow, error: sessionError } = await supabaseAdmin
     .from("game_sessions")
-    .insert({ room_id: roomId, game_id: "who-am-i", started_at: new Date().toISOString() })
+    .insert({
+      room_id: roomId,
+      game_id: "who-am-i",
+      started_at: new Date().toISOString(),
+      state: initialTurnState(playerIds),
+    })
     .select("id")
     .single();
 

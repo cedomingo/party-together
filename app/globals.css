@@ -244,3 +244,98 @@ button:disabled {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* "Who Am I?" — Turn Loop & Question Log (SPEC.md §8 "Turn Loop", §5
+   questions_log). */
+.who-am-i-turn {
+  margin-top: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.who-am-i-turn h2 {
+  margin: 0 0 0.35rem;
+}
+
+.who-am-i-turn-indicator {
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.who-am-i-ask-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.who-am-i-active-question {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-am-i-active-question p {
+  margin: 0;
+}
+
+.who-am-i-answer-buttons {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.who-am-i-answer-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.who-am-i-log {
+  margin-top: 1rem;
+}
+
+.who-am-i-log h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.who-am-i-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-am-i-log-entry {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.who-am-i-log-question {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.who-am-i-log-answers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
