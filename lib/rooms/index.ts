@@ -361,6 +361,15 @@ export async function joinRoomByCode(
     .select()
     .single();
 
+  console.log("[DEBUG joinRoomByCode] player insert failed", {
+    code: insertError?.code,
+    message: insertError?.message,
+    details: insertError?.details,
+    hint: insertError?.hint,
+    roomId: room.id,
+    userId,
+  });
+
   if (insertError || !playerRow) {
     // The RLS guard above can also reject this insert directly (a race
     // between the count check and another player's concurrent join) —
