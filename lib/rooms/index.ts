@@ -265,12 +265,13 @@ export async function createRoom({
     throw new RoomError(playerError.message);
   }
 
-  // TEMP: we don't have playerRow anymore
+// TEMP: we don't have playerRow anymore
   return {
     roomId: room.id,
     code: room.code,
     playerId: "",
   };
+}
 
 export interface JoinRoomResult {
   roomId: string;
