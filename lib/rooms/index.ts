@@ -252,28 +252,25 @@ export async function createRoom({
     roomMaxPlayers: room.max_players,
   });
 
-  const { data: playerRow, error: playerError } = await supabase
+  const { error: playerError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, nickname: cleanNickname, is_host: true })
-    .select()
-    .single();
+    .insert({
+      room_id: room.id,
+      nickname: cleanNickname,
+      is_host: true,
+    });
 
-  if (playerError || !playerRow) {
+  if (playerError) {
     console.log("[DEBUG createRoom] player insert failed", playerError);
-    throw new RoomError(playerError?.message ?? "Failed to create host player.");
+    throw new RoomError(playerError.message);
   }
 
-  const { error: updateError } = await supabase
-    .from("rooms")
-    .update({ host_player_id: playerRow.id })
-    .eq("id", room.id);
-
-  if (updateError) {
-    throw new RoomError(updateError.message);
-  }
-
-  return { roomId: room.id, code: room.code, playerId: playerRow.id };
-}
+  // TEMP: we don't have playerRow anymore
+  return {
+    roomId: room.id,
+    code: room.code,
+    playerId: "",
+  };
 
 export interface JoinRoomResult {
   roomId: string;
