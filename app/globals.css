@@ -2,7 +2,11 @@
   color-scheme: light dark;
   --accent: #6c5ce7;
   --border: color-mix(in srgb, currentColor 15%, transparent);
-  --danger: #d64545;
+  /* #c0392b, not the earlier #d64545 — the old value measured ~4.38:1
+     against white, just under WCAG AA's 4.5:1 for normal-size text
+     (.field-error runs at 0.85rem). This measures ~5.4:1 (SPEC.md §11
+     accessibility). */
+  --danger: #c0392b;
   --online: #2ecc71;
   --offline: #999;
 }
@@ -11,10 +15,105 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Mobile Safari/Chrome zoom-on-focus workaround relies on inputs being
+     >=16px; this keeps the base scale sane without fighting that (SPEC.md
+     §11 mobile-first). */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------
+   Accessibility: focus states (SPEC.md §11 "proper focus states").
+   One global rule for every interactive element instead of relying on
+   each browser's inconsistent default outline, or (worse) individual
+   components remembering to add their own. `:focus-visible` (not
+   `:focus`) so this only shows for keyboard/assistive-tech navigation,
+   not on every mouse click. `.who-am-i-card` already had its own
+   equivalent rule (Phase 5) — left as-is below since it also has to sit
+   on top of that button's `overflow`/background, but it's the same
+   outline color/offset as everything else here.
+   ------------------------------------------------------------------- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-to-content link (app/layout.tsx). Visually hidden until it
+   receives keyboard focus, then pinned to the top-left corner above
+   everything else. */
+.skip-link {
+  position: absolute;
+  top: -3rem;
+  left: 0.5rem;
+  z-index: 100;
+  background: var(--accent);
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 0;
+  outline-offset: -2px;
+}
+
+/* Respect reduced-motion preferences (SPEC.md §11 accessibility) — every
+   animation in this file (typing pulse, loading spinner) gets frozen to
+   a static frame instead of removed outright, so the *information* the
+   animation conveys (something is loading / someone is typing) is still
+   visible, just not moving. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Mobile-first touch targets (SPEC.md §11). Most players open a shared
+   room link on a phone — WCAG 2.5.5/Apple & Material guidance both land
+   on ~44px as the practical minimum comfortable tap target. Applied
+   globally to every button/rendered-as-button rather than per-component
+   so a future game module gets this for free.
+   ------------------------------------------------------------------- */
+button,
+.who-am-i-card {
+  min-height: 44px;
+}
+
+/* Buttons keep `width: fit-content` (below) on pointer-driven devices,
+   but that packs two side-by-side buttons (e.g. Yes/No) uncomfortably
+   close together on a narrow phone screen — grow them to share the row
+   evenly instead once a container opts in. */
+.who-am-i-answer-buttons button {
+  flex: 1;
+}
+
+/* Tapping a button on iOS otherwise shows a few hundred ms of grey
+   highlight and can trigger a double-tap-to-zoom delay; this app has no
+   use for either. */
+button,
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .page {
@@ -148,6 +247,61 @@ button:disabled {
   color: white;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
+}
+
+/* ---------------------------------------------------------------------
+   Shared state screen (app/components/StatusScreen.tsx) — loading,
+   room-not-found, room-full, room-already-started, and generic error
+   (SPEC.md §11 "clean loading/empty/error states"). One look for all of
+   them instead of each being a bespoke block of centered text.
+   ------------------------------------------------------------------- */
+.state-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 3rem 1rem;
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.state-screen h1 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.state-screen-body {
+  max-width: 40ch;
+}
+
+.state-screen-body p {
+  margin: 0;
+}
+
+.state-screen-error {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.state-screen-actions {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.state-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: state-spinner-spin 0.8s linear infinite;
+}
+
+@keyframes state-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Generic shell for a registered game's placeholder room view (Phase 3).
@@ -509,4 +663,52 @@ button:disabled {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border);
+}
+
+/* ---------------------------------------------------------------------
+   Mobile-first responsive refinements (SPEC.md §11). Most of this file
+   is already mobile-first by construction (single-column flex/grid
+   layouts that only gain columns at wider breakpoints — see `.two-up`
+   above). This block tightens up the handful of spots that were tuned
+   for a laptop viewport and cramp on a small phone.
+   ------------------------------------------------------------------- */
+@media (max-width: 480px) {
+  .page {
+    padding: 1.25rem 0.85rem 3rem;
+  }
+
+  .state-screen {
+    padding: 2.25rem 0.75rem;
+  }
+
+  /* 96px cards (desktop default) leave an awkward 2.something-column
+     layout around ~360-390px-wide phones; 78px settles cleanly into a
+     4-column grid at that width without shrinking the tap target below
+     the 44px minimum enforced above (the full card, not just the
+     image, is the tappable button). */
+  .who-am-i-grid {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .who-am-i-card-name {
+    font-size: 0.72rem;
+  }
+
+  /* Two side-by-side action buttons (Yes/No, or a form's own submit next
+     to a host control) are the main place `width: fit-content` (the
+     button default) produces awkward thumb-reach targets on a narrow
+     screen — stack them instead. `.who-am-i-answer-buttons` already grows
+     them to fill the row (see the `flex: 1` rule above) rather than
+     stacking, since Yes/No specifically reads better side-by-side even
+     on a phone; this only affects the rest.
+     */
+  .who-am-i-host-controls,
+  .room-header {
+    align-items: stretch;
+  }
+
+  .room-header button {
+    width: 100%;
+  }
 }

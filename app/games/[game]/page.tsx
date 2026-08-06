@@ -26,7 +26,7 @@ export default async function GameLandingPage({
   // TODO(seo-phase): notFound() when config is undefined once games exist;
   // TODO(seo-phase): generateMetadata() driven by `config` per §4.
   return (
-    <main className="page">
+    <main className="page" id="main-content">
       <h1>{config?.displayName ?? game}</h1>
       {config ? (
         <>

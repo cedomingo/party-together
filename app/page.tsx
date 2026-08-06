@@ -9,7 +9,7 @@ import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 
 export default function HomePage() {
   return (
-    <main className="page">
+    <main className="page" id="main-content">
       <h1>Party Together</h1>
       <p className="lede">Create a room, share the link, and play browser-based party games with friends.</p>
 

@@ -324,6 +324,63 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     };
   }, [supabase, sessionId]);
 
+  // ---- reconnect-safety net (SPEC.md §11) --------------------------------
+  // Same rationale as RoomClient.tsx's identically-shaped effect: the
+  // postgres_changes subscription above is the normal path for staying in
+  // sync, but a backgrounded phone can silently drop that WebSocket
+  // without this component ever unmounting to trigger a fresh load. When
+  // the tab becomes visible/online again, just re-read `state` and
+  // `questions_log` straight from Postgres — the same source of truth the
+  // initial-load effect already trusts — so a stale/dropped channel can't
+  // leave the turn indicator or question log frozen on an old value.
+  // Doesn't touch `crossedOff` (that's local-first, and re-fetching it
+  // could stomp a tap made in the same instant this fires) or the recap
+  // fetch (its own effect already re-runs whenever `endedAt` changes).
+  useEffect(() => {
+    if (!sessionId) return;
+    let inFlight = false;
+
+    async function resync() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const { data: sessionRow } = await supabase
+          .from("game_sessions")
+          .select("state, ended_at")
+          .eq("id", sessionId)
+          .maybeSingle();
+        if (sessionRow) {
+          if (isWhoAmITurnState(sessionRow.state)) setTurnState(sessionRow.state);
+          if (sessionRow.ended_at) setEndedAt(sessionRow.ended_at as string);
+        }
+
+        const { data: questionRows } = await supabase
+          .from("questions_log")
+          .select("id, session_id, asking_player_id, question_text, created_at, answers, resolved")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true });
+        if (questionRows) setQuestions(questionRows as QuestionLogRow[]);
+      } catch {
+        // Best-effort — same reasoning as RoomClient's resync: the realtime
+        // subscription is the primary path, this is just a backstop.
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible") resync();
+    }
+    window.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("online", resync);
+    window.addEventListener("pageshow", resync);
+    return () => {
+      window.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", resync);
+      window.removeEventListener("pageshow", resync);
+    };
+  }, [supabase, sessionId]);
+
   // ---- realtime: Broadcast channel (SPEC.md §9) --------------------------
   // Layered on top of the postgres_changes subscription above — see this
   // file's header and games/who-am-i/realtime/broadcastEvents.ts for why

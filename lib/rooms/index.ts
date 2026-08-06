@@ -45,6 +45,7 @@ export interface Player {
 export class RoomError extends Error {}
 export class RoomNotFoundError extends RoomError {}
 export class RoomAlreadyStartedError extends RoomError {}
+export class RoomFullError extends RoomError {}
 export class InvalidNicknameError extends RoomError {}
 export class AuthSessionError extends RoomError {}
 
@@ -320,6 +321,28 @@ export async function joinRoomByCode(
     );
   }
 
+  // Room-full check (SPEC.md §7: "host can optionally set [a max player
+  // cap]"; §11: "clean ... error states for ... room-full"). Only applies
+  // to *new* joins — an existing player reconnecting (handled above,
+  // before this point) always gets their slot back even if the room later
+  // filled up around them. This is a friendly-error backstop, not the
+  // actual access boundary: `players_insert_self_join_lobby` (see
+  // supabase/migrations/20260806121000_room_full_guard.sql) enforces the
+  // same cap at the RLS level, so a direct/racing insert can't slip past
+  // it even if this check is skipped or stale.
+  if (room.max_players != null) {
+    const { count, error: countError } = await supabase
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", room.id);
+    if (countError) throw new RoomError(countError.message);
+    if ((count ?? 0) >= room.max_players) {
+      throw new RoomFullError(
+        `This room is full (max ${room.max_players} player${room.max_players === 1 ? "" : "s"}).`
+      );
+    }
+  }
+
   const { data: playerRow, error: insertError } = await supabase
     .from("players")
     .insert({ room_id: room.id, nickname: cleanNickname, is_host: false })
@@ -327,6 +350,18 @@ export async function joinRoomByCode(
     .single();
 
   if (insertError || !playerRow) {
+    // The RLS guard above can also reject this insert directly (a race
+    // between the count check and another player's concurrent join) —
+    // Postgres reports that as a generic RLS policy violation (42501), not
+    // a distinguishable error shape, so it surfaces as a room-full message
+    // too rather than a confusing raw DB error.
+    if ((insertError as { code?: string } | null)?.code === "42501") {
+      throw new RoomFullError(
+        room.max_players != null
+          ? `This room is full (max ${room.max_players} player${room.max_players === 1 ? "" : "s"}).`
+          : "This room is no longer accepting new players."
+      );
+    }
     throw new RoomError(insertError?.message ?? "Failed to join room.");
   }
 

@@ -16,7 +16,6 @@
 // either way — it still only ever calls into the registry.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   ensureAnonSession,
@@ -30,6 +29,7 @@ import {
 } from "@/lib/rooms";
 import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
+import { StatusScreen } from "@/app/components/StatusScreen";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
@@ -192,6 +192,73 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return () => window.removeEventListener("pagehide", handlePageHide);
   }, []);
 
+  // ---- reconnect-safety net: re-sync when the tab comes back (SPEC.md
+  // §11 "reconnect-safe: refreshing the page mid-game should not lose a
+  // player's state") -------------------------------------------------
+  // A full page refresh already rehydrates everything correctly (see the
+  // initial-load effect above — it reads room/players straight from
+  // Postgres on every mount). This effect covers the *other* half of
+  // "reconnect-safe": a phone locked/backgrounded for a while, or a laptop
+  // waking from sleep, doesn't unmount this component at all — React state
+  // and the existing Realtime channels just sit there, and mobile OSes in
+  // particular are known to silently drop idle WebSocket connections
+  // without the app ever seeing a clean close event. Rather than trust
+  // that Realtime always reconnects (supabase-js does retry, but "does
+  // retry" isn't the same guarantee as "definitely already has"), treat
+  // becoming visible/online again as a cheap cue to reconcile straight
+  // from Postgres: re-fetch room + players and, if this session's own row
+  // had fallen out of `connected`, flip it back — the same
+  // source-of-truth read the initial load already trusts, just re-run
+  // without a full reload.
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = userId;
+
+  useEffect(() => {
+    if (!room) return;
+    let inFlight = false;
+
+    async function resync() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [freshRoom, playerRows] = await Promise.all([
+          getRoomByCode(supabase, code),
+          listPlayers(supabase, room!.id),
+        ]);
+        if (freshRoom) setRoom(freshRoom);
+        setPlayers(playerRows);
+
+        const mine = playerRows.find((p) => p.auth_id === userIdRef.current);
+        if (mine && !mine.connected) {
+          await setPlayerConnected(supabase, mine.id, true).catch(() => undefined);
+          setPlayers((prev) => prev.map((p) => (p.id === mine.id ? { ...p, connected: true } : p)));
+        }
+      } catch {
+        // Best-effort — the Realtime subscriptions and the next natural
+        // resync attempt are the backstop; don't surface a transient
+        // background-refresh failure as a user-facing error.
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible") resync();
+    }
+    window.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("online", resync);
+    window.addEventListener("pageshow", resync);
+    return () => {
+      window.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", resync);
+      window.removeEventListener("pageshow", resync);
+    };
+    // Keyed on room?.id, not `room` — same rationale as the postgres-changes
+    // effect above: `room` changes on every resync, which would otherwise
+    // tear down and re-add these listeners in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, code, room?.id]);
+
   async function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setJoining(true);
@@ -246,39 +313,38 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   }
 
   // ------------------------------------------------------------- render --
+  // Every non-happy-path below (loading, room-not-found, room-full,
+  // room-already-started, generic error) renders through the shared
+  // <StatusScreen> so they're visually and semantically consistent
+  // (SPEC.md §11).
 
   if (state === "loading") {
-    return (
-      <main className="page">
-        <p>Loading room…</p>
-      </main>
-    );
+    return <StatusScreen kind="loading" title="Loading room…" showHomeLink={false} />;
   }
 
   if (state === "not-found") {
     return (
-      <main className="page">
-        <h1>Room not found</h1>
-        <p>No room exists for code &ldquo;{code.toUpperCase()}&rdquo;. It may have expired or never existed.</p>
-        <Link href="/">Back to home</Link>
-      </main>
+      <StatusScreen kind="info" title="Room not found">
+        <p>
+          No room exists for code &ldquo;{code.toUpperCase()}&rdquo;. It may have expired or never
+          existed.
+        </p>
+      </StatusScreen>
     );
   }
 
   if (state === "error" || !room) {
     return (
-      <main className="page">
-        <h1>Something went wrong</h1>
+      <StatusScreen kind="error" title="Something went wrong">
         <p>{errorMessage ?? "Please try again."}</p>
-        <Link href="/">Back to home</Link>
-      </main>
+      </StatusScreen>
     );
   }
 
   // Known member: show the lobby / in-progress view.
   if (currentPlayer) {
     return (
-      <main className="page">
+      <main className="page" id="main-content">
         <header className="room-header">
           <div>
             <h1>{gameConfig?.displayName ?? room.game_id}</h1>
@@ -286,7 +352,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
               Room code: <strong>{room.code}</strong>
             </p>
           </div>
-          <button type="button" onClick={handleCopyLink}>
+          <button type="button" onClick={handleCopyLink} aria-live="polite">
             {copyLabel}
           </button>
         </header>
@@ -371,16 +437,39 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // Not a member yet.
   if (room.status !== "lobby") {
     return (
-      <main className="page">
-        <h1>{gameConfig?.displayName ?? room.game_id}</h1>
-        <p>This room has already started, and you weren&rsquo;t part of it — new players can&rsquo;t join mid-game.</p>
-        <Link href="/">Back to home</Link>
-      </main>
+      <StatusScreen kind="info" title={gameConfig?.displayName ?? room.game_id}>
+        <p>
+          This room has already started, and you weren&rsquo;t part of it — new players can&rsquo;t
+          join mid-game.
+        </p>
+      </StatusScreen>
+    );
+  }
+
+  // Room-full (SPEC.md §7 host-set max_players cap; §11 room-full error
+  // state). Checked here — before rendering the join form at all — for
+  // anyone landing on the room link who isn't already a member; an
+  // existing member is always handled by the branch above instead (a room
+  // filling up after you joined never locks you out of your own slot).
+  // This is a friendly pre-check only: the actual submit still goes
+  // through `joinRoomByCode` (see lib/rooms/index.ts), which re-checks
+  // server-side and surfaces the same message if this got stale between
+  // page-load and submit (e.g. two people opening the link at once).
+  const isRoomFull = room.max_players != null && players.length >= room.max_players;
+  if (isRoomFull) {
+    return (
+      <StatusScreen kind="info" title="Room is full">
+        <p>
+          {gameConfig?.displayName ?? room.game_id} — room <strong>{room.code}</strong> already has its
+          maximum of {room.max_players} player{room.max_players === 1 ? "" : "s"}. Ask the host to open a
+          new room, or check back if someone might drop.
+        </p>
+      </StatusScreen>
     );
   }
 
   return (
-    <main className="page">
+    <main className="page" id="main-content">
       <h1>Join room {room.code}</h1>
       <p className="lede">{gameConfig?.displayName ?? room.game_id}</p>
       <form className="panel-form" onSubmit={handleJoinSubmit}>
