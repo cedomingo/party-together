@@ -13,7 +13,7 @@ The first game to ship is **"Who Am I?"** — a party game (working title only, 
 - **Frontend/Framework:** Next.js (App Router), deployed on **Vercel**
 - **Backend/DB/Realtime/Storage:** **Supabase** (Postgres + Row Level Security + Supabase Realtime + Supabase Storage for character images)
 - **Edge/Security:** **Cloudflare** in front of Vercel (DNS, DDoS protection, bot/rate-limit rules, WAF)
-- **Auth:** None required for players — anonymous nickname + generated player ID (stored in a signed cookie/localStorage) is sufficient for both host and guests. No login system needed for v1.
+- **Auth:** No login/account system for players — nickname only, no email/password/OAuth. Identity is provided by **Supabase Anonymous Auth** (`supabase.auth.signInAnonymously()`), giving every browser session a real `auth.users` row and `auth.uid()` behind the scenes, invisible to the player. This is what the "generated player ID" is: an app-level `players` row keyed off that `auth.uid()` via an `auth_id` column (one player row per room per anonymous session, so a session can join multiple rooms). This is a deliberate architectural decision, not just a convenience — it's the only way Row Level Security (§5) can actually distinguish one player's browser from another's; a shared anon API key alone cannot. Requires enabling Anonymous Sign-ins in the Supabase project (`supabase/config.toml` → `[auth] enable_anonymous_sign_ins = true` for local dev; Dashboard → Authentication → Providers → Anonymous in production).
 
 ---
 
@@ -58,7 +58,7 @@ partytogether.com/games/who-am-i/room/ABCD   → actual live room (noindex, nofo
 Design tables so the schema supports multiple games without per-game migrations for basic room/lobby data:
 
 - **rooms**: `id`, `code` (short shareable code), `host_player_id`, `game_id`, `status` (lobby / in_progress / finished), `max_players`, `created_at`, `expires_at`
-- **players**: `id`, `room_id`, `nickname`, `is_host` (bool), `connected` (bool), `joined_at`
+- **players**: `id`, `room_id`, `auth_id` (references `auth.users`, from anonymous auth — see §2), `nickname`, `is_host` (bool), `connected` (bool), `joined_at`
 - **game_sessions**: `id`, `room_id`, `game_id`, `state` (jsonb — flexible per-game state), `started_at`, `ended_at`
 - **who_am_i_assignments** (game-specific table, scoped to this game only): `session_id`, `player_id`, `character_id`, `crossed_off_character_ids` (array), `is_guessed` (bool)
 - **characters**: `id`, `name`, `image_url`, `active` (bool) — the fixed global 25-character roster
