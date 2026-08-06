@@ -262,6 +262,47 @@ button:disabled {
   margin: 0 0 0.75rem;
 }
 
+.who-am-i-offline-hint {
+  margin: -0.4rem 0 0.75rem;
+}
+
+.who-am-i-typing-indicator {
+  margin: -0.4rem 0 0.75rem;
+  font-style: italic;
+}
+
+.who-am-i-typing-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.4em;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: who-am-i-typing-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes who-am-i-typing-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.who-am-i-live-feed {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
 .who-am-i-ask-form {
   display: flex;
   flex-direction: column;

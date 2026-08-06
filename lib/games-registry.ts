@@ -67,6 +67,16 @@ export interface GameRoomViewProps {
   room: Room;
   players: Player[];
   currentPlayer: Player;
+  /**
+   * Player ids currently tracked as online by the platform core's Presence
+   * channel (SPEC.md §9 "Presence to track which players are currently
+   * connected") — see RoomClient.tsx's `room-presence:<room.id>` channel.
+   * Passed down rather than re-tracked here so there's only ever one
+   * Presence subscription per room, shared by the lobby view and whichever
+   * game module is rendering. A game module is free to ignore this if it
+   * has no use for live online/offline status.
+   */
+  onlineIds: Set<string>;
 }
 
 type GameRoomView = ComponentType<GameRoomViewProps>;

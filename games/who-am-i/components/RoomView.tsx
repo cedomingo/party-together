@@ -35,13 +35,27 @@
 // board only needs `crossed_off_character_ids` from that row, never
 // `character_id`.
 //
-// Realtime here is plain Postgres-changes subscriptions on `game_sessions`
-// and `questions_log` (same pattern RoomClient already uses for
-// rooms/players) — Postgres remains the source of truth either way. The
-// richer Broadcast channel (typing indicators, etc. — SPEC.md §9) is
-// still Phase 7; this is enough for the turn loop to feel live without it.
+// Realtime here is a Postgres-changes subscription on `game_sessions` and
+// `questions_log` (same pattern RoomClient already uses for rooms/players)
+// PLUS a per-session Broadcast channel (games/who-am-i/realtime/
+// broadcastEvents.ts) for the low-latency, ephemeral events SPEC.md §9
+// calls out: the active-turn indicator, "player is typing a question,"
+// sequential answer prompts, and "I'm Done" events. Postgres remains the
+// source of truth either way — the Broadcast channel only ever pushes
+// forward a state update the postgres_changes subscription would also
+// deliver a moment later (or, for typing, something that was never meant
+// to be persisted at all). A page refresh mid-game never touches
+// Broadcast or Presence — the initial-load effect below reads `state`,
+// `questions_log`, and this player's own board row straight from
+// Postgres, so rehydration is correct with or without either channel.
+//
+// Presence (SPEC.md §9's "which players are currently connected") is
+// tracked once, centrally, by RoomClient's `room-presence:<room.id>`
+// channel and passed down as the `onlineIds` prop — this component reads
+// it to flag when whoever's up next appears to be offline, but never
+// opens its own Presence subscription.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { GameRoomViewProps } from "@/lib/games-registry";
@@ -52,6 +66,11 @@ import {
   type WhoAmITurnState,
 } from "@/games/who-am-i/logic/turnState";
 import { WhoAmIRecap, type WhoAmIRecapEntry } from "@/games/who-am-i/components/Recap";
+import {
+  useWhoAmIBroadcast,
+  type WhoAmITurnEvent,
+  type WhoAmITurnEventKind,
+} from "@/games/who-am-i/realtime/broadcastEvents";
 
 interface CharacterRow {
   id: string;
@@ -94,7 +113,7 @@ type LoadState = "loading" | "ready" | "not-started" | "no-assignment" | "error"
 
 const MAX_QUESTION_LENGTH = 280;
 
-export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewProps) {
+export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: GameRoomViewProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [state, setState] = useState<LoadState>("loading");
@@ -305,6 +324,55 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
     };
   }, [supabase, sessionId]);
 
+  // ---- realtime: Broadcast channel (SPEC.md §9) --------------------------
+  // Layered on top of the postgres_changes subscription above — see this
+  // file's header and games/who-am-i/realtime/broadcastEvents.ts for why
+  // this is additive UX responsiveness, never a second source of truth.
+  const handleTurnSync = useCallback((state: WhoAmITurnState) => setTurnState(state), []);
+  const { typingPlayerIds, liveEvents, notifyTyping, broadcastTurnSync, broadcastTurnEvent } =
+    useWhoAmIBroadcast({
+      supabase,
+      sessionId,
+      currentPlayerId: currentPlayer.id,
+      onTurnSync: handleTurnSync,
+    });
+
+  // Debounced "I'm typing a question" signal — only ever sent while it's
+  // actually this player's turn to ask (see the input's onChange below).
+  // Auto-clears after a pause in typing, on submit, and on unmount, so a
+  // dropped final "stopped typing" broadcast doesn't matter: receivers
+  // also time it out independently (broadcastEvents.ts).
+  const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTypingSignal = useCallback(() => {
+    if (typingStopTimeoutRef.current) {
+      clearTimeout(typingStopTimeoutRef.current);
+      typingStopTimeoutRef.current = null;
+    }
+    notifyTyping(false);
+  }, [notifyTyping]);
+  const handleQuestionDraftChange = useCallback(
+    (value: string) => {
+      setQuestionDraft(value);
+      if (!sessionId) return;
+      if (typingStopTimeoutRef.current) clearTimeout(typingStopTimeoutRef.current);
+      if (value.trim().length > 0) {
+        notifyTyping(true);
+        typingStopTimeoutRef.current = setTimeout(() => {
+          typingStopTimeoutRef.current = null;
+          notifyTyping(false);
+        }, 2000);
+      } else {
+        notifyTyping(false);
+      }
+    },
+    [sessionId, notifyTyping]
+  );
+  useEffect(() => {
+    return () => {
+      if (typingStopTimeoutRef.current) clearTimeout(typingStopTimeoutRef.current);
+    };
+  }, []);
+
   // ---- recap data: unmasked board, once the game has ended --------------
   // Only fires once `endedAt` is set (initial load or realtime, see
   // above) — before that, `who_am_i_board` still masks every player's own
@@ -360,8 +428,13 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       });
       const payload = await response.json().catch(() => ({}) as { error?: string; state?: unknown });
       if (!response.ok) throw new Error(payload.error ?? "Failed to submit question.");
-      if (isWhoAmITurnState(payload.state)) setTurnState(payload.state);
+      if (isWhoAmITurnState(payload.state)) {
+        setTurnState(payload.state);
+        broadcastTurnSync(payload.state);
+      }
+      broadcastTurnEvent("question-asked");
       setQuestionDraft("");
+      stopTypingSignal();
     } catch (err) {
       setAskError(err instanceof Error ? err.message : "Failed to submit question.");
     } finally {
@@ -381,7 +454,11 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       });
       const payload = await response.json().catch(() => ({}) as { error?: string; state?: unknown });
       if (!response.ok) throw new Error(payload.error ?? "Failed to submit answer.");
-      if (isWhoAmITurnState(payload.state)) setTurnState(payload.state);
+      if (isWhoAmITurnState(payload.state)) {
+        setTurnState(payload.state);
+        broadcastTurnSync(payload.state);
+      }
+      broadcastTurnEvent("answer-submitted");
     } catch (err) {
       setAnswerError(err instanceof Error ? err.message : "Failed to submit answer.");
     } finally {
@@ -401,7 +478,11 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       });
       const payload = await response.json().catch(() => ({}) as { error?: string; state?: unknown });
       if (!response.ok) throw new Error(payload.error ?? "Failed to end turn.");
-      if (isWhoAmITurnState(payload.state)) setTurnState(payload.state);
+      if (isWhoAmITurnState(payload.state)) {
+        setTurnState(payload.state);
+        broadcastTurnSync(payload.state);
+      }
+      broadcastTurnEvent("turn-done");
     } catch (err) {
       setDoneError(err instanceof Error ? err.message : "Failed to end turn.");
     } finally {
@@ -431,7 +512,11 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
         () => ({}) as { error?: string; state?: unknown; correct?: boolean; gameEnded?: boolean }
       );
       if (!response.ok) throw new Error(payload.error ?? "Failed to submit guess.");
-      if (isWhoAmITurnState(payload.state)) setTurnState(payload.state);
+      if (isWhoAmITurnState(payload.state)) {
+        setTurnState(payload.state);
+        broadcastTurnSync(payload.state);
+      }
+      broadcastTurnEvent(payload.correct ? "guess-correct" : "guess-incorrect");
       setGuessResult(payload.correct ? "correct" : "incorrect");
       setGuessCharacterId("");
       // The response already tells us the game ended (a correct guess that
@@ -440,7 +525,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       // The exact timestamp doesn't matter to this component; it's only
       // ever used as a "has the game ended" flag and to key the recap
       // fetch effect above.
-      if (payload.gameEnded) setEndedAt(new Date().toISOString());
+      if (payload.gameEnded) {
+        setEndedAt(new Date().toISOString());
+        broadcastTurnEvent("game-ended");
+      }
     } catch (err) {
       setGuessError(err instanceof Error ? err.message : "Failed to submit guess.");
     } finally {
@@ -466,6 +554,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       const payload = await response.json().catch(() => ({}) as { error?: string });
       if (!response.ok) throw new Error(payload.error ?? "Failed to end the game.");
       setEndedAt(new Date().toISOString());
+      broadcastTurnEvent("game-ended");
     } catch (err) {
       setEndGameError(err instanceof Error ? err.message : "Failed to end the game.");
     } finally {
@@ -485,6 +574,31 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       : null;
   const hasSolved = turnState?.solvedPlayerIds.includes(currentPlayer.id) ?? false;
   const canGuess = !endedAt && !hasSolved && (isMyTurnToAsk || isReviewingMyTurn);
+
+  // ---- presence-derived hint (SPEC.md §9 Presence) -----------------------
+  // Whoever the turn indicator is currently waiting on — the asker while
+  // "asking"/"reviewing", the current responder while "answering" — flagged
+  // if `onlineIds` (tracked centrally by RoomClient's Presence channel, see
+  // this file's header) says they're not currently connected. This is only
+  // ever a UX hint layered on top of Postgres-derived turn state, never a
+  // substitute for it: the turn itself doesn't change because of presence.
+  const activeTurnPlayerId = turnState?.phase === "answering" ? responderId : askerId;
+  const activeTurnPlayerOffline =
+    !!activeTurnPlayerId && activeTurnPlayerId !== currentPlayer.id && !onlineIds.has(activeTurnPlayerId);
+
+  // ---- Broadcast-derived live activity feed (SPEC.md §9) -----------------
+  function describeTurnEvent(event: WhoAmITurnEvent): string {
+    const name = nicknameFor(event.playerId);
+    const byKind: Record<WhoAmITurnEventKind, string> = {
+      "question-asked": `${name} asked a question.`,
+      "answer-submitted": `${name} answered.`,
+      "turn-done": `${name} ended their turn.`,
+      "guess-correct": `${name} solved it! 🎉`,
+      "guess-incorrect": `${name} guessed — not quite.`,
+      "game-ended": `The game has ended.`,
+    };
+    return byKind[event.kind];
+  }
 
   // ---- recap derived data (SPEC.md §8 point 7) ---------------------------
   // Ranked by `solvedPlayerIds` order (the order players actually solved
@@ -585,6 +699,37 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
                   : `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`)}
             </p>
 
+            {/* Presence hint (SPEC.md §9) — layered on top of the turn
+                indicator above, never a replacement for it: the turn
+                itself is still driven entirely by Postgres-backed
+                `turnState`, this just explains a stall if it happens. */}
+            {activeTurnPlayerOffline && (
+              <p className="who-am-i-offline-hint muted" role="status">
+                {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline right now — hang tight,
+                they may be reconnecting.
+              </p>
+            )}
+
+            {/* Typing indicator (SPEC.md §9) — Broadcast-only, never
+                persisted; see games/who-am-i/realtime/broadcastEvents.ts. */}
+            {turnState.phase === "asking" && !isMyTurnToAsk && askerId && typingPlayerIds.has(askerId) && (
+              <p className="who-am-i-typing-indicator muted" aria-live="polite">
+                {nicknameFor(askerId)} is typing a question…
+              </p>
+            )}
+
+            {/* Live activity feed (SPEC.md §9 "I'm Done events" + friends)
+                — ephemeral Broadcast toasts, not the permanent question
+                log below. A refresh never restores this list, by design;
+                see the file header. */}
+            {liveEvents.length > 0 && (
+              <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
+                {liveEvents.map((event) => (
+                  <li key={event.id}>{describeTurnEvent(event)}</li>
+                ))}
+              </ul>
+            )}
+
             {/* Guess-your-identity (SPEC.md §8 point 6) — available on your
                 turn, whether you're about to ask ("asking") or reviewing
                 answers ("reviewing"), any time you haven't already solved
@@ -659,7 +804,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
                   <span>Ask a yes/no question</span>
                   <input
                     value={questionDraft}
-                    onChange={(e) => setQuestionDraft(e.target.value)}
+                    onChange={(e) => handleQuestionDraftChange(e.target.value)}
                     maxLength={MAX_QUESTION_LENGTH}
                     required
                     placeholder="e.g. Am I a real person?"

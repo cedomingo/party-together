@@ -348,6 +348,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
                 room={room}
                 players={players}
                 currentPlayer={currentPlayer}
+                onlineIds={onlineIds}
               />
             ) : (
               <p>
