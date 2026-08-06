@@ -239,6 +239,15 @@ export async function createRoom({
     );
   }
 
+  // TEMP DEBUG — remove after diagnosing RLS issue
+  const { data: debugUser } = await supabase.auth.getUser();
+  console.log("[DEBUG createRoom]", {
+    authUid: debugUser.user?.id ?? null,
+    roomId: room.id,
+    roomStatus: room.status,
+    roomMaxPlayers: room.max_players,
+  });
+
   const { data: playerRow, error: playerError } = await supabase
     .from("players")
     .insert({ room_id: room.id, nickname: cleanNickname, is_host: true })
@@ -246,6 +255,7 @@ export async function createRoom({
     .single();
 
   if (playerError || !playerRow) {
+    console.log("[DEBUG createRoom] player insert failed", playerError);
     throw new RoomError(playerError?.message ?? "Failed to create host player.");
   }
 
