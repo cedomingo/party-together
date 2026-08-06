@@ -18,9 +18,17 @@ import "server-only";
 // on top, in application code (see the RLS migration's own "Open RLS edge
 // cases" comments for why that's deferred rather than pushed into a
 // policy).
+//
+// Phase 6b addition: `loadSessionForTurn` now also resolves whether the
+// caller is the room's host (needed by the manual "end game" route) and
+// rejects any turn-loop action outright once the session has already
+// ended (`ended_at` set) — SPEC.md §8 point 7's game-end condition should
+// be a hard stop for question/answer/done/guess, not just something the
+// UI happens to hide.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isWhoAmITurnState, type WhoAmITurnState } from "@/games/who-am-i/logic/turnState";
 
 export class TurnRequestError extends Error {
@@ -37,6 +45,7 @@ export interface LoadedTurnSession {
   sessionId: string;
   roomId: string;
   callerPlayerId: string;
+  callerIsHost: boolean;
   state: WhoAmITurnState;
 }
 
@@ -55,7 +64,7 @@ export async function loadSessionForTurn(sessionId: string): Promise<LoadedTurnS
 
   const { data: session, error: sessionError } = await supabase
     .from("game_sessions")
-    .select("id, room_id, game_id, state")
+    .select("id, room_id, game_id, state, ended_at")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -67,10 +76,13 @@ export async function loadSessionForTurn(sessionId: string): Promise<LoadedTurnS
   if (session.game_id !== "who-am-i") {
     throw new TurnRequestError("This session isn't a Who Am I? session.", 400);
   }
+  if (session.ended_at) {
+    throw new TurnRequestError("This game has already ended.", 409);
+  }
 
   const { data: callerPlayer, error: callerError } = await supabase
     .from("players")
-    .select("id")
+    .select("id, is_host")
     .eq("room_id", session.room_id)
     .eq("auth_id", userData.user.id)
     .maybeSingle();
@@ -88,6 +100,7 @@ export async function loadSessionForTurn(sessionId: string): Promise<LoadedTurnS
     sessionId: session.id as string,
     roomId: session.room_id as string,
     callerPlayerId: callerPlayer.id as string,
+    callerIsHost: callerPlayer.is_host as boolean,
     state: session.state,
   };
 }
@@ -107,3 +120,60 @@ export async function saveTurnState(
     throw new TurnRequestError(error.message, 500);
   }
 }
+
+/**
+ * Ends a "Who Am I?" game (SPEC.md §8 point 7): flips `rooms.status` to
+ * `finished` and stamps `game_sessions.ended_at`. Called from two places,
+ * each authorizing differently before it gets here:
+ *
+ *   - `guess/route.ts`, when a correct guess makes every player solved.
+ *     That's a system-detected condition, not a host action, and the
+ *     solving player is frequently *not* the host — `rooms_update_host_only`
+ *     (RLS) would reject that player's own client trying to flip `rooms`,
+ *     so this path always uses the service-role admin client. The
+ *     legitimacy of the call was already established by the guess route
+ *     re-deriving `isGameFullySolved` from state it just verified.
+ *   - `end/route.ts`, when the host manually ends the game. There, the
+ *     caller genuinely is the host, so their own cookie-authenticated
+ *     client already satisfies `rooms_update_host_only` and
+ *     `game_sessions_update_room_members` — no admin client needed, and
+ *     using one would just be an unnecessary RLS bypass for a write RLS
+ *     already allows.
+ *
+ * Both writes are guarded (`status = 'in_progress'`, `ended_at is null`)
+ * so a race between the two end-paths (or a double-submit of either) is a
+ * harmless no-op on the second call rather than a duplicate/conflicting
+ * write.
+ */
+export async function endGameSession(
+  client: SupabaseClient,
+  roomId: string,
+  sessionId: string
+): Promise<void> {
+  const { error: sessionUpdateError } = await client
+    .from("game_sessions")
+    .update({ ended_at: new Date().toISOString() })
+    .eq("id", sessionId)
+    .is("ended_at", null);
+
+  if (sessionUpdateError) {
+    throw new TurnRequestError(sessionUpdateError.message, 500);
+  }
+
+  const { error: roomUpdateError } = await client
+    .from("rooms")
+    .update({ status: "finished" })
+    .eq("id", roomId)
+    .eq("status", "in_progress");
+
+  if (roomUpdateError) {
+    throw new TurnRequestError(roomUpdateError.message, 500);
+  }
+}
+
+/**
+ * Thin re-export so callers that need the admin client for the
+ * system-detected "all players solved" end path (see `endGameSession`
+ * doc above) don't need their own import of `lib/supabase/admin`.
+ */
+export { createSupabaseAdminClient };

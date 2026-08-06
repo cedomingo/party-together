@@ -9,12 +9,17 @@
 // (jsonb — flexible per-game state)") — that's the column this whole
 // module is designed around. It is NOT stored anywhere else.
 //
-// Deliberately out of scope for this phase (Phase 6a): guessing/solved
-// state and the game-end condition. `turnOrder` never shrinks or
-// reorders itself here — advancing just walks around a fixed ring. A
-// later phase (6b) that adds guessing will need to teach `advanceTurn`
-// to skip already-solved players; that's a follow-up, not something to
-// half-implement now.
+// Phase 6a shipped the ask/answer/done loop only and deliberately left
+// guessing/solved state and the game-end condition out — see that phase's
+// comment (now superseded below) about `advanceTurn` needing to learn to
+// skip already-solved players. This is that follow-up (Phase 6b, SPEC.md
+// §8 points 6-7): `turnOrder` still never shrinks or reorders — it's a
+// fixed ring for the whole session — but `solvedPlayerIds` now tracks who
+// has correctly guessed, and every transition that picks "who's up next"
+// skips them. A solved player is never removed from `turnOrder` itself
+// (they still need a stable seat to answer other players' questions from,
+// per SPEC.md §8 point 6: "removed from asking rotation but can remain to
+// answer others' questions") — only skipped when choosing the next asker.
 
 export type WhoAmITurnPhase = "asking" | "answering" | "reviewing";
 
@@ -30,6 +35,13 @@ export interface WhoAmITurnState {
   answeringOrder: string[];
   /** Index into answeringOrder of whose turn it is to answer next. */
   answeringIndex: number;
+  /**
+   * Player ids who have correctly guessed their own character, in the
+   * order they solved it (SPEC.md §8 point 7: recap shows "in what
+   * order"). Still present in `turnOrder` and still answer other players'
+   * questions — just skipped when picking the next asker.
+   */
+  solvedPlayerIds: string[];
 }
 
 export class TurnStateError extends Error {}
@@ -49,6 +61,7 @@ export function initialTurnState(turnOrder: readonly string[]): WhoAmITurnState 
     activeQuestionId: null,
     answeringOrder: [],
     answeringIndex: 0,
+    solvedPlayerIds: [],
   };
 }
 
@@ -69,7 +82,9 @@ export function isWhoAmITurnState(value: unknown): value is WhoAmITurnState {
     (v.activeQuestionId === null || typeof v.activeQuestionId === "string") &&
     Array.isArray(v.answeringOrder) &&
     v.answeringOrder.every((id) => typeof id === "string") &&
-    typeof v.answeringIndex === "number"
+    typeof v.answeringIndex === "number" &&
+    Array.isArray(v.solvedPlayerIds) &&
+    v.solvedPlayerIds.every((id) => typeof id === "string")
   );
 }
 
@@ -80,6 +95,45 @@ export function currentAskerId(state: WhoAmITurnState): string | null {
 export function currentResponderId(state: WhoAmITurnState): string | null {
   if (state.phase !== "answering") return null;
   return state.answeringOrder[state.answeringIndex] ?? null;
+}
+
+/** SPEC.md §8 point 7: "Game ends when all players have guessed correctly." */
+export function isGameFullySolved(state: WhoAmITurnState): boolean {
+  return state.turnOrder.length > 0 && state.solvedPlayerIds.length >= state.turnOrder.length;
+}
+
+/**
+ * Walks forward around `turnOrder` from the current asker, skipping any
+ * player already in `solvedPlayerIds`, and returns the index of the next
+ * player who should be up to ask. Falls back to the current index if
+ * every player is solved (that's the game-end condition — callers should
+ * check `isGameFullySolved` and stop driving the turn loop before this
+ * fallback would ever actually surface to a player).
+ */
+function nextAskerIndex(state: WhoAmITurnState): number {
+  const total = state.turnOrder.length;
+  for (let step = 1; step <= total; step++) {
+    const candidateIndex = (state.currentTurnIndex + step) % total;
+    if (!state.solvedPlayerIds.includes(state.turnOrder[candidateIndex]!)) {
+      return candidateIndex;
+    }
+  }
+  return state.currentTurnIndex;
+}
+
+/**
+ * Shared tail end of both `advanceTurn` ("I'm Done") and `submitGuess`:
+ * reset to a fresh "asking" phase for whichever unsolved player is next.
+ */
+function resetToNextAsker(state: WhoAmITurnState): WhoAmITurnState {
+  return {
+    ...state,
+    currentTurnIndex: nextAskerIndex(state),
+    phase: "asking",
+    activeQuestionId: null,
+    answeringOrder: [],
+    answeringIndex: 0,
+  };
 }
 
 /**
@@ -141,21 +195,56 @@ export function advanceAfterAnswer(state: WhoAmITurnState): WhoAmITurnState {
 }
 
 /**
- * Transition: asker presses "I'm Done" — turn passes to the next player
- * in turnOrder (wrapping around) and the loop resets to "asking" for
- * them. Guessing/solved-skipping is explicitly not handled here — see
- * file header.
+ * Transition: asker presses "I'm Done" — turn passes to the next
+ * not-yet-solved player in turnOrder (wrapping around, skipping anyone in
+ * `solvedPlayerIds`) and the loop resets to "asking" for them.
  */
 export function advanceTurn(state: WhoAmITurnState): WhoAmITurnState {
   if (state.phase !== "reviewing") {
     throw new TurnStateError(`Cannot end a turn during phase "${state.phase}".`);
   }
-  return {
-    ...state,
-    currentTurnIndex: (state.currentTurnIndex + 1) % state.turnOrder.length,
-    phase: "asking",
-    activeQuestionId: null,
-    answeringOrder: [],
-    answeringIndex: 0,
-  };
+  return resetToNextAsker(state);
+}
+
+/**
+ * Transition: the current asker attempts to guess their own identity
+ * (SPEC.md §8 point 6). Allowed "at any point on their turn instead of/
+ * after asking a question" — read here as: before they've submitted a
+ * question this turn ("asking" phase) or after a question round has
+ * fully resolved and they're reviewing the board ("reviewing" phase).
+ * Guessing mid-"answering" (while other players are still mid-response to
+ * the question this same player just asked) is deliberately not allowed —
+ * that would leave a question half-resolved with no clean way to unwind
+ * it, which the spec doesn't describe. This mirrors the "no penalty for
+ * a wrong guess" default the spec calls out as an open design decision.
+ *
+ * `correct` is the caller's job to determine (by writing the player's
+ * guess to `who_am_i_assignments.guessed_character_id` and reading back
+ * the generated `is_guessed` column via the `who_am_i_board` masking
+ * view) — this function never sees or needs `character_id` itself, so
+ * there's no way for this module to leak it.
+ *
+ * Either way (right or wrong) the guess ends the current player's turn,
+ * same as pressing "I'm Done" — see SPEC.md §8 point 6: a wrong guess
+ * just "wastes the turn," and a right one has nothing left to do this
+ * turn since the player is now solved.
+ */
+export function submitGuess(
+  state: WhoAmITurnState,
+  guesserId: string,
+  correct: boolean
+): WhoAmITurnState {
+  if (state.phase !== "asking" && state.phase !== "reviewing") {
+    throw new TurnStateError(`Cannot guess during phase "${state.phase}".`);
+  }
+  if (currentAskerId(state) !== guesserId) {
+    throw new TurnStateError("It isn't your turn to guess.");
+  }
+  if (state.solvedPlayerIds.includes(guesserId)) {
+    throw new TurnStateError("You've already solved your identity.");
+  }
+
+  const solvedPlayerIds = correct ? [...state.solvedPlayerIds, guesserId] : state.solvedPlayerIds;
+
+  return resetToNextAsker({ ...state, solvedPlayerIds });
 }
