@@ -240,9 +240,13 @@ export async function createRoom({
   }
 
   // TEMP DEBUG — remove after diagnosing RLS issue
-  const { data: debugUser } = await supabase.auth.getUser();
+  const { data: authCtx, error: authCtxError } = await supabase.rpc(
+    "debug_auth_context"
+  );
+
+  console.log("[DEBUG createRoom] pg-side auth context", authCtx, authCtxError);
+
   console.log("[DEBUG createRoom]", {
-    authUid: debugUser.user?.id ?? null,
     roomId: room.id,
     roomStatus: room.status,
     roomMaxPlayers: room.max_players,
