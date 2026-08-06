@@ -2,8 +2,10 @@
 
 // Game-agnostic live room view (SPEC.md §7, §9). This is platform core —
 // it renders the lobby, player list, host badge, and "Start Game" stub for
-// ANY registered game. It never imports from /games/**, only from the
-// registry's GameConfig shape for display copy (name / min-max players).
+// ANY registered game. It never imports from /games/** directly — only
+// from /lib/games-registry.ts, both for the GameConfig shape (display copy)
+// and, once a game starts, to resolve whichever component that game
+// registered for its in-room view (see `getGameRoomView` below).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -19,7 +21,7 @@ import {
   type Player,
   type Room,
 } from "@/lib/rooms";
-import type { GameConfig } from "@/lib/games-registry";
+import { getGameRoomView, type GameConfig } from "@/lib/games-registry";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
@@ -43,6 +45,13 @@ export function RoomClient({ code, gameConfig }: { code: string; gameConfig: Gam
   const currentPlayer = useMemo(
     () => players.find((p) => p.auth_id === userId) ?? null,
     [players, userId]
+  );
+  // Resolved via the registry, not imported from /games/** directly — see
+  // /lib/games-registry.ts. This is the whole point of Phase 3: this file
+  // never needs to know "Who Am I?" (or any future game) exists.
+  const GameRoomView = useMemo(
+    () => getGameRoomView(gameConfig?.id ?? room?.game_id ?? ""),
+    [gameConfig?.id, room?.game_id]
   );
   const currentPlayerIdRef = useRef<string | null>(null);
   currentPlayerIdRef.current = currentPlayer?.id ?? null;
@@ -296,10 +305,23 @@ export function RoomClient({ code, gameConfig }: { code: string; gameConfig: Gam
 
         {room.status === "in_progress" && (
           <section>
-            <p>
-              <strong>Game started.</strong> The {gameConfig?.displayName ?? room.game_id} game view isn&rsquo;t
-              built yet — this is where the registered game module takes over (platform core stops here).
-            </p>
+            {/* Platform core stops here: rendering for an in-progress game is
+                always resolved through the registry, never hardcoded to a
+                specific game. If a game hasn't registered a room view (or
+                the room's game_id is unrecognized), fall back to a plain
+                status line instead of assuming any particular game exists. */}
+            {gameConfig && GameRoomView ? (
+              <GameRoomView
+                gameConfig={gameConfig}
+                room={room}
+                players={players}
+                currentPlayer={currentPlayer}
+              />
+            ) : (
+              <p>
+                <strong>Game started.</strong> No room view is registered for &ldquo;{room.game_id}&rdquo;.
+              </p>
+            )}
           </section>
         )}
 

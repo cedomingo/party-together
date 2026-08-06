@@ -149,3 +149,21 @@ button:disabled {
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
 }
+
+/* Generic shell for a registered game's placeholder room view (Phase 3).
+   Intentionally minimal/game-agnostic styling — real per-game visuals
+   belong inside that game module, not here. */
+.game-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.game-placeholder p:first-child {
+  font-weight: 600;
+}

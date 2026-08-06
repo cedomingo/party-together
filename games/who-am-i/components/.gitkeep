@@ -1,6 +1,0 @@
-Placeholder directory for Who Am I? React components:
-  - CharacterBoard.tsx   (25-character grid, tap to cross off)
-  - QuestionLog.tsx      (scrollable public Q&A history)
-  - TurnControls.tsx     (ask question / answer yes-no / guess / "I'm Done")
-  - ResultsRecap.tsx     (end-of-game recap screen)
-Populated when the game module is built.
