@@ -154,6 +154,15 @@ Apply **Row Level Security**: players can only read/write within their own room;
 
 ---
 
+## 11a. Dev Tooling
+
+- ESLint config at `.eslintrc.json` extending `next/core-web-vitals` and
+  `next/typescript` (matches what `next lint`'s interactive setup would
+  generate) — `npm run lint` must be runnable non-interactively in CI, not
+  just locally via the `next lint` prompt.
+
+---
+
 ## 12. Build Instructions Summary (for the coding agent)
 
 1. Scaffold the Next.js app on Vercel with the routing structure in §4.

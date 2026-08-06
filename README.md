@@ -8,8 +8,16 @@ See `SPEC.md` for the full build spec.
 
 ## Status
 
-**Phase 0 — scaffolding.** Folder structure, empty Next.js app, and Supabase
-client helpers only. No rooms, no games, no database tables yet.
+**Phase 2 — Platform Core: Rooms & Lobby.** Create/join/lobby flow works
+end-to-end: short room codes, join by link or code, nickname-only identity
+(Supabase Anonymous Auth), live lobby (connected players + host badge),
+host-only "Start Game" stub (flips room status, zero game logic), best-effort
+disconnect/reconnect handling, and a cron-ready room expiry cleanup endpoint.
+See `supabase/PHASE1_NOTES.md` for the Phase 1 data model/RLS writeup.
+
+No game itself is implemented yet — "Who Am I?" is registered in
+`lib/games-registry.ts` as metadata only (name/description/player counts),
+with no board, turn system, or components.
 
 ## Stack
 

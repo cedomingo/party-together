@@ -12,6 +12,8 @@
 // Scaffolding only in Phase 0.
 
 import { getGameConfig } from "@/lib/games-registry";
+import { CreateRoomForm } from "@/app/components/CreateRoomForm";
+import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 
 export default async function GameLandingPage({
   params,
@@ -24,9 +26,22 @@ export default async function GameLandingPage({
   // TODO(seo-phase): notFound() when config is undefined once games exist;
   // TODO(seo-phase): generateMetadata() driven by `config` per §4.
   return (
-    <main>
+    <main className="page">
       <h1>{config?.displayName ?? game}</h1>
-      <p>Game landing page placeholder — Phase 0 scaffolding.</p>
+      {config ? (
+        <>
+          <p className="lede">{config.description}</p>
+          <p className="muted">
+            {config.minPlayers}–{config.maxPlayers} players
+          </p>
+          <div className="two-up">
+            <CreateRoomForm games={[config]} fixedGameId={config.id} />
+            <JoinRoomForm />
+          </div>
+        </>
+      ) : (
+        <p>Game landing page placeholder — Phase 0 scaffolding.</p>
+      )}
     </main>
   );
 }

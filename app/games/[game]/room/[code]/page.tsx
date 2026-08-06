@@ -12,6 +12,8 @@
 //     via /lib/games-registry.ts so this file stays game-agnostic)
 
 import type { Metadata } from "next";
+import { getGameConfig } from "@/lib/games-registry";
+import { RoomClient } from "./RoomClient";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -23,13 +25,12 @@ export default async function RoomPage({
   params: Promise<{ game: string; code: string }>;
 }) {
   const { game, code } = await params;
+  const gameConfig = getGameConfig(game);
 
-  // TODO(platform-core): resolve room by `code`, lobby/in-progress views.
-  return (
-    <main>
-      <h1>Room {code}</h1>
-      <p>Game: {game}</p>
-      <p>Live room placeholder — Phase 0 scaffolding.</p>
-    </main>
-  );
+  // Room resolution, join-if-needed, and the live lobby all happen
+  // client-side (see RoomClient) — reading `rooms`/`players` requires an
+  // authenticated (anonymous) Supabase session, which can only be
+  // established/persisted from a Client Component, Server Action, or Route
+  // Handler, not a plain Server Component render.
+  return <RoomClient code={code} gameConfig={gameConfig} />;
 }

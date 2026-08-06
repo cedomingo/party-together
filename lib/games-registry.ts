@@ -20,10 +20,13 @@ export interface GameConfig {
   thumbnailPath: string;
 }
 
-// Phase 0: no game modules exist yet, so the registry is empty.
-// Phase for "who-am-i" will add:
-//   import { whoAmIConfig } from "@/games/who-am-i/config";
-export const games: GameConfig[] = [];
+// Phase 2: only the metadata (this GameConfig) is registered — no board,
+// turn system, or any other "Who Am I?" logic lands until its own game
+// module phase. This is what SPEC.md §7's "picks a game from the registry"
+// step needs to have anything to pick from.
+import { whoAmIConfig } from "@/games/who-am-i/config";
+
+export const games: GameConfig[] = [whoAmIConfig];
 
 export function getGameConfig(id: string): GameConfig | undefined {
   return games.find((g) => g.id === id);
