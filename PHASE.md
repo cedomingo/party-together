@@ -91,15 +91,63 @@ Do NOT build the question/answer turn loop yet — that's the next phase.
 Stop when done and wait for my confirmation before continuing.
 
 
-Phase 6 — Turn Loop & Question Log
-Goal: The core gameplay loop.
-Implement the turn loop from SPEC.md §8 ("Turn Loop" section) and the
-questions_log persistence from §5: turn order, public yes/no question
-submission, sequential answer collection from other players, "I'm Done"
-to end turn, guess attempt + solved state, and the scrollable public
-Q&A log. Game end condition and recap screen per §8 point 7.
+Phase 6a — Turn Loop & Question Log (core).
+Implement from SPEC.md §8 ("Turn Loop") and §5 (questions_log persistence):
+turn order, public yes/no/type (other) question submission, sequential
+answer collection from other players, and "I'm Done" to end turn.
 
-Stop when done and wait for my confirmation before continuing.
+Don't implement the guess/solved flow, game end condition, or recap
+screen yet — that's a separate follow-up. Stop when done and wait for
+my confirmation before continuing.
+
+Phase 6b 1
+Clone https://github.com/cedomingo/party-together and read SPEC.md and
+PHASE.md. Phase 6a is already implemented for the who-am-i game: turn
+order, question submission, sequential answer collection, and "I'm Done"
+(app/api/games/who-am-i/{question,answer,done}/route.ts, plus
+turnState.ts and turnSession.ts). Verify these exist — don't redo them.
+
+Implement ONLY the backend/logic half of Phase 6b, per SPEC.md §8
+points 6–7:
+
+1. Extend turnState.ts / turnSession.ts as needed: guess attempt on a
+   player's turn, correct → mark "solved" + remove from asking rotation
+   (still answers others' questions), incorrect → turn passes as normal,
+   no penalty.
+2. Game end condition: all players solved, OR host manually ends the
+   game.
+3. New API route(s) for submitting a guess and for host-triggered
+   manual end. Enforce the same RLS/query-scoping as the rest of the
+   game — never leak character_id outside the correctness check.
+4. Any migration needed to support recap data (e.g. revealing
+   character_id once the game has ended).
+
+Do NOT build the recap UI component, do NOT touch RoomView.tsx/
+RoomClient.tsx rendering, and do NOT run build/lint/tests yet. Stop
+once the backend logic and routes are written and wait for my
+confirmation before continuing.
+
+Phase 6b 2
+Continuing Phase 6b on the who-am-i game. The guess/end-game backend
+logic and routes from the previous step are done. Now implement the
+frontend half, per SPEC.md §8 point 7:
+
+1. A Recap component: ranked list of who guessed correctly in what
+   order, plus the full public Q&A log.
+2. Wire RoomView.tsx to show a guess UI during play and render the
+   Recap once the game has ended.
+3. Update RoomClient.tsx if needed so the "finished" room status
+   delegates to the game module's recap view instead of a generic
+   message.
+4. Add any CSS classes this UI needs to globals.css.
+
+Do NOT run build/lint/tests or smoke-test yet. Stop once written and
+wait for my confirmation before continuing.
+
+
+
+
+
 
 
 Phase 7 — Realtime Wiring
