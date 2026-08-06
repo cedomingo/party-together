@@ -339,3 +339,133 @@ button:disabled {
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+/* "Who Am I?" — guess-your-identity + host "End Game" controls
+   (SPEC.md §8 points 6-7). */
+.who-am-i-guess-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.who-am-i-guess-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-am-i-guess-result {
+  margin: 0;
+  font-weight: 600;
+}
+
+.who-am-i-guess-result-correct {
+  color: var(--online);
+}
+
+.who-am-i-guess-result-incorrect {
+  color: var(--danger);
+}
+
+.who-am-i-solved-note {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.who-am-i-host-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.who-am-i-host-controls button {
+  background: var(--danger);
+}
+
+/* "Who Am I?" — Recap screen (SPEC.md §8 point 7). */
+.who-am-i-recap {
+  margin-top: 0.5rem;
+}
+
+.who-am-i-recap h2 {
+  margin: 0 0 0.35rem;
+}
+
+.who-am-i-recap-ranking {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-am-i-recap-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.who-am-i-recap-rank {
+  flex-shrink: 0;
+  width: 2rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.who-am-i-recap-image {
+  position: relative;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.who-am-i-recap-image img {
+  object-fit: cover;
+}
+
+.who-am-i-recap-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.who-am-i-recap-unsolved {
+  margin-top: 1.25rem;
+}
+
+.who-am-i-recap-unsolved h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.who-am-i-recap-unsolved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.who-am-i-recap-log {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}

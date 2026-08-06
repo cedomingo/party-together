@@ -6,6 +6,14 @@
 // from /lib/games-registry.ts, both for the GameConfig shape (display copy)
 // and, once a game starts, to resolve whichever component that game
 // registered for its in-room view (see `getGameRoomView` below).
+//
+// That resolved component is also what renders for a "finished" room, not
+// just "in_progress" — the registry doesn't have (and doesn't need) a
+// separate "recap view" slot per game. A game module's own room view is
+// trusted to look at `room.status` / its own session state and decide what
+// "in progress" vs. "finished" looks like internally (SPEC.md §8 point 7's
+// recap screen, for "who-am-i"). This file stays exactly as game-agnostic
+// either way — it still only ever calls into the registry.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -321,12 +329,18 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
           </section>
         )}
 
-        {room.status === "in_progress" && (
+        {(room.status === "in_progress" || room.status === "finished") && (
           <section>
-            {/* Platform core stops here: rendering for an in-progress game is
-                always resolved through the registry, never hardcoded to a
-                specific game. If a game hasn't registered a room view (or
-                the room's game_id is unrecognized), fall back to a plain
+            {/* Platform core stops here: rendering for an in-progress OR
+                finished game is always resolved through the registry, never
+                hardcoded to a specific game. A game's own room-view
+                component decides internally what to show for each status —
+                for "who-am-i" that means the turn loop / board while
+                `room.status` is "in_progress", and the recap once its
+                session has ended (which is also when `room.status` flips to
+                "finished" — see app/api/games/who-am-i/_lib/turnSession.ts's
+                `endGameSession`). If a game hasn't registered a room view
+                (or the room's game_id is unrecognized), fall back to a plain
                 status line instead of assuming any particular game exists. */}
             {gameConfig && GameRoomView ? (
               <GameRoomView
@@ -337,15 +351,10 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
               />
             ) : (
               <p>
-                <strong>Game started.</strong> No room view is registered for &ldquo;{room.game_id}&rdquo;.
+                <strong>{room.status === "finished" ? "Game finished." : "Game started."}</strong> No
+                room view is registered for &ldquo;{room.game_id}&rdquo;.
               </p>
             )}
-          </section>
-        )}
-
-        {room.status === "finished" && (
-          <section>
-            <p>This game has finished.</p>
           </section>
         )}
 

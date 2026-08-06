@@ -13,11 +13,16 @@
 // (public question form, sequential answer prompts, "I'm Done", scrollable
 // Q&A log).
 //
-// Deliberately NOT implemented here (that's a separate follow-up phase):
-// guessing your identity, "solved" state, the game-end condition, and the
-// recap screen. Turn state never marks anyone "solved" in this phase —
-// `advanceTurn` (games/who-am-i/logic/turnState.ts) always just walks to
-// the next player in the fixed turnOrder ring.
+// Phase 6a shipped the ask/answer/done loop only (guessing, "solved"
+// state, the game-end condition, and the recap screen were deliberately
+// left out — see that phase's comment, now superseded). Phase 6b adds the
+// rest of SPEC.md §8 points 6-7 on the frontend: a guess-your-identity
+// control (backed by app/api/games/who-am-i/guess/route.ts), a host-only
+// "End Game" control (app/api/games/who-am-i/end/route.ts), and — once
+// `game_sessions.ended_at` is set, by either path — handing rendering off
+// entirely to <WhoAmIRecap> instead of the turn loop / board. See
+// ../logic/turnState.ts for the `solvedPlayerIds` / phase rules those
+// controls are constrained by.
 //
 // The "can never see my own character" rule isn't re-implemented here —
 // it's already enforced upstream, at the RLS/query level, by the
@@ -46,6 +51,7 @@ import {
   isWhoAmITurnState,
   type WhoAmITurnState,
 } from "@/games/who-am-i/logic/turnState";
+import { WhoAmIRecap, type WhoAmIRecapEntry } from "@/games/who-am-i/components/Recap";
 
 interface CharacterRow {
   id: string;
@@ -67,6 +73,21 @@ interface QuestionLogRow {
   created_at: string;
   answers: Record<string, "yes" | "no">;
   resolved: boolean;
+}
+
+/**
+ * Shape of a `who_am_i_board` row once `game_sessions.ended_at` is set —
+ * that's the only condition under which the view's `character_id` case
+ * (supabase/migrations/..._who_am_i_recap_reveal.sql) stops nulling out
+ * the caller's own row, so this is only ever fetched for the recap, never
+ * during an in-progress session.
+ */
+interface RevealedBoardRow {
+  session_id: string;
+  player_id: string;
+  character_id: string | null;
+  guessed_character_id: string | null;
+  is_guessed: boolean;
 }
 
 type LoadState = "loading" | "ready" | "not-started" | "no-assignment" | "error";
@@ -92,6 +113,25 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
   const [answering, setAnswering] = useState(false);
   const [doneError, setDoneError] = useState<string | null>(null);
   const [endingTurn, setEndingTurn] = useState(false);
+
+  // ---- guess / game-end (SPEC.md §8 points 6-7) --------------------------
+  const [guessCharacterId, setGuessCharacterId] = useState("");
+  const [guessSubmitting, setGuessSubmitting] = useState(false);
+  const [guessError, setGuessError] = useState<string | null>(null);
+  const [guessResult, setGuessResult] = useState<"correct" | "incorrect" | null>(null);
+  const [endGameSubmitting, setEndGameSubmitting] = useState(false);
+  const [endGameError, setEndGameError] = useState<string | null>(null);
+
+  // ---- recap (SPEC.md §8 point 7) ----------------------------------------
+  // Set from `game_sessions.ended_at`, either on initial load or via the
+  // realtime subscription below — whichever end path fired
+  // (system-detected "all solved" in guess/route.ts, or a host manually
+  // ending it in end/route.ts), this is the single signal this component
+  // uses to hand rendering off to <WhoAmIRecap>.
+  const [endedAt, setEndedAt] = useState<string | null>(null);
+  const [recapRows, setRecapRows] = useState<RevealedBoardRow[]>([]);
+  const [recapLoading, setRecapLoading] = useState(false);
+  const [recapError, setRecapError] = useState<string | null>(null);
 
   const nicknameFor = useCallback(
     (playerId: string) => players.find((p) => p.id === playerId)?.nickname ?? "Someone",
@@ -122,7 +162,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
         // see games/who-am-i/logic/turnState.ts for its shape.
         const { data: sessionRow, error: sessionError } = await supabase
           .from("game_sessions")
-          .select("id, state")
+          .select("id, state, ended_at")
           .eq("room_id", room.id)
           .eq("game_id", "who-am-i")
           .order("started_at", { ascending: false })
@@ -137,6 +177,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
         if (cancelled) return;
         setSessionId(sessionRow.id as string);
         setTurnState(isWhoAmITurnState(sessionRow.state) ? sessionRow.state : null);
+        setEndedAt((sessionRow.ended_at as string | null) ?? null);
 
         // Full public question log for this session (questions_log_select_
         // room_members RLS policy), oldest first so it reads top-to-bottom
@@ -236,8 +277,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "game_sessions", filter: `id=eq.${sessionId}` },
         (payload) => {
-          const nextState = (payload.new as { state?: unknown }).state;
-          if (isWhoAmITurnState(nextState)) setTurnState(nextState);
+          const row = payload.new as { state?: unknown; ended_at?: string | null };
+          if (isWhoAmITurnState(row.state)) setTurnState(row.state);
+          if (row.ended_at) setEndedAt(row.ended_at);
         }
       )
       .on(
@@ -262,6 +304,40 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       supabase.removeChannel(channel);
     };
   }, [supabase, sessionId]);
+
+  // ---- recap data: unmasked board, once the game has ended --------------
+  // Only fires once `endedAt` is set (initial load or realtime, see
+  // above) — before that, `who_am_i_board` still masks every player's own
+  // row, so there'd be nothing new to read here anyway (see
+  // supabase/migrations/..._who_am_i_recap_reveal.sql).
+  useEffect(() => {
+    if (!sessionId || !endedAt) return;
+    let cancelled = false;
+
+    async function loadRecap() {
+      setRecapLoading(true);
+      setRecapError(null);
+      try {
+        const { data, error } = await supabase
+          .from("who_am_i_board")
+          .select("session_id, player_id, character_id, guessed_character_id, is_guessed")
+          .eq("session_id", sessionId);
+        if (error) throw new Error(error.message);
+        if (!cancelled) setRecapRows((data ?? []) as RevealedBoardRow[]);
+      } catch (err) {
+        if (!cancelled) {
+          setRecapError(err instanceof Error ? err.message : "Failed to load the recap.");
+        }
+      } finally {
+        if (!cancelled) setRecapLoading(false);
+      }
+    }
+
+    loadRecap();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, sessionId, endedAt]);
 
   // ---- turn loop actions: ask / answer / done ----------------------------
   // Each of these hits a trusted API route (app/api/games/who-am-i/{question,
@@ -333,6 +409,70 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
     }
   }
 
+  // ---- guess your identity (SPEC.md §8 point 6) --------------------------
+  // Hits guess/route.ts, which enforces the same "asking" or "reviewing"
+  // phase + current-asker ownership rules as `submitGuess`
+  // (games/who-am-i/logic/turnState.ts) — this handler doesn't duplicate
+  // that check, it just applies whatever `state` comes back so a rejected
+  // guess (409/403) surfaces as `guessError` instead of silently no-op'ing.
+  async function submitGuessAttempt(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!sessionId || !guessCharacterId) return;
+    setGuessSubmitting(true);
+    setGuessError(null);
+    setGuessResult(null);
+    try {
+      const response = await fetch("/api/games/who-am-i/guess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, characterId: guessCharacterId }),
+      });
+      const payload = await response.json().catch(
+        () => ({}) as { error?: string; state?: unknown; correct?: boolean; gameEnded?: boolean }
+      );
+      if (!response.ok) throw new Error(payload.error ?? "Failed to submit guess.");
+      if (isWhoAmITurnState(payload.state)) setTurnState(payload.state);
+      setGuessResult(payload.correct ? "correct" : "incorrect");
+      setGuessCharacterId("");
+      // The response already tells us the game ended (a correct guess that
+      // made every player solved — see guess/route.ts) — flip to the
+      // recap immediately rather than waiting on the realtime round-trip.
+      // The exact timestamp doesn't matter to this component; it's only
+      // ever used as a "has the game ended" flag and to key the recap
+      // fetch effect above.
+      if (payload.gameEnded) setEndedAt(new Date().toISOString());
+    } catch (err) {
+      setGuessError(err instanceof Error ? err.message : "Failed to submit guess.");
+    } finally {
+      setGuessSubmitting(false);
+    }
+  }
+
+  // ---- host: manually end the game (SPEC.md §8 point 7) ------------------
+  // Hits end/route.ts, which enforces host-only server-side — this handler
+  // doesn't re-check `currentPlayer.is_host` itself beyond gating whether
+  // the control renders at all (see the render section below).
+  async function handleEndGame() {
+    if (!sessionId) return;
+    if (!window.confirm("End the game now for everyone? This can't be undone.")) return;
+    setEndGameSubmitting(true);
+    setEndGameError(null);
+    try {
+      const response = await fetch("/api/games/who-am-i/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      const payload = await response.json().catch(() => ({}) as { error?: string });
+      if (!response.ok) throw new Error(payload.error ?? "Failed to end the game.");
+      setEndedAt(new Date().toISOString());
+    } catch (err) {
+      setEndGameError(err instanceof Error ? err.message : "Failed to end the game.");
+    } finally {
+      setEndGameSubmitting(false);
+    }
+  }
+
   // ---- turn loop derived view state --------------------------------------
   const askerId = turnState ? currentAskerId(turnState) : null;
   const responderId = turnState ? currentResponderId(turnState) : null;
@@ -343,6 +483,45 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
     turnState?.activeQuestionId != null
       ? (questions.find((q) => q.id === turnState.activeQuestionId) ?? null)
       : null;
+  const hasSolved = turnState?.solvedPlayerIds.includes(currentPlayer.id) ?? false;
+  const canGuess = !endedAt && !hasSolved && (isMyTurnToAsk || isReviewingMyTurn);
+
+  // ---- recap derived data (SPEC.md §8 point 7) ---------------------------
+  // Ranked by `solvedPlayerIds` order (the order players actually solved
+  // it in), unsolved players last. Only meaningful once `recapRows` has
+  // loaded — see the effect above.
+  const recapEntries: WhoAmIRecapEntry[] = useMemo(() => {
+    if (!turnState || recapRows.length === 0) return [];
+    const characterById = new Map(characters.map((c) => [c.id, c]));
+    const rowByPlayer = new Map(recapRows.map((r) => [r.player_id, r]));
+    const solvedOrder = turnState.solvedPlayerIds;
+
+    return players
+      .map((p) => {
+        const row = rowByPlayer.get(p.id);
+        const rank = solvedOrder.includes(p.id) ? solvedOrder.indexOf(p.id) + 1 : null;
+        const character = row?.character_id ? characterById.get(row.character_id) : undefined;
+        const guessedCharacter = row?.guessed_character_id
+          ? characterById.get(row.guessed_character_id)
+          : undefined;
+        return {
+          playerId: p.id,
+          nickname: p.nickname,
+          isYou: p.id === currentPlayer.id,
+          rank,
+          characterName: character?.name ?? null,
+          characterImageUrl: character?.image_url ?? null,
+          guessedCharacterName: guessedCharacter?.name ?? null,
+          correct: row?.is_guessed === true,
+        };
+      })
+      .sort((a, b) => {
+        if (a.rank != null && b.rank != null) return a.rank - b.rank;
+        if (a.rank != null) return -1;
+        if (b.rank != null) return 1;
+        return a.nickname.localeCompare(b.nickname);
+      });
+  }, [turnState, recapRows, characters, players, currentPlayer.id]);
 
   // ------------------------------------------------------------- render --
 
@@ -359,6 +538,21 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
       <p className="field-error" role="alert">
         {errorMessage ?? "Something went wrong loading the board."}
       </p>
+    );
+  }
+
+  // Once the game has ended (either end path — see file header), rendering
+  // is handed off entirely to the recap; the turn loop / board below is
+  // for an in-progress session only.
+  if (endedAt) {
+    return (
+      <WhoAmIRecap
+        entries={recapEntries}
+        questions={questions}
+        nicknameFor={nicknameFor}
+        loading={recapLoading}
+        error={recapError}
+      />
     );
   }
 
@@ -390,6 +584,74 @@ export function WhoAmIRoomView({ room, players, currentPlayer }: GameRoomViewPro
                   ? "All answers are in — review them, update your board, then end your turn."
                   : `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`)}
             </p>
+
+            {/* Guess-your-identity (SPEC.md §8 point 6) — available on your
+                turn, whether you're about to ask ("asking") or reviewing
+                answers ("reviewing"), any time you haven't already solved
+                it. Host end-game control sits alongside it since both are
+                "leave the normal turn flow" actions. */}
+            <div className="who-am-i-guess-panel">
+              {hasSolved && (
+                <p className="who-am-i-solved-note">
+                  You solved it! You can still answer everyone else&rsquo;s questions.
+                </p>
+              )}
+
+              {canGuess && (
+                <form className="who-am-i-guess-form" onSubmit={submitGuessAttempt}>
+                  <label className="field">
+                    <span>Think you know who you are?</span>
+                    <select
+                      value={guessCharacterId}
+                      onChange={(e) => setGuessCharacterId(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Choose a character…
+                      </option>
+                      {characters.map((character) => (
+                        <option key={character.id} value={character.id}>
+                          {character.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {guessError && (
+                    <p className="field-error" role="alert">
+                      {guessError}
+                    </p>
+                  )}
+                  <button type="submit" disabled={guessSubmitting || !guessCharacterId}>
+                    {guessSubmitting ? "Guessing…" : "Guess"}
+                  </button>
+                </form>
+              )}
+
+              {guessResult && (
+                <p
+                  className={`who-am-i-guess-result who-am-i-guess-result-${guessResult}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {guessResult === "correct"
+                    ? "Correct! You solved it. 🎉"
+                    : "Not quite — your turn ends."}
+                </p>
+              )}
+
+              {currentPlayer.is_host && (
+                <div className="who-am-i-host-controls">
+                  {endGameError && (
+                    <p className="field-error" role="alert">
+                      {endGameError}
+                    </p>
+                  )}
+                  <button type="button" onClick={handleEndGame} disabled={endGameSubmitting}>
+                    {endGameSubmitting ? "Ending…" : "End game (host)"}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {isMyTurnToAsk && (
               <form className="who-am-i-ask-form" onSubmit={submitQuestion}>
