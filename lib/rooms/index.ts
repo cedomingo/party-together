@@ -203,6 +203,16 @@ export async function createRoom({
   maxPlayers = null,
 }: CreateRoomParams): Promise<CreateRoomResult> {
   await ensureAnonSession(supabase);
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  console.log("[DEBUG createRoom]", {
+    userId: user?.id,
+    error: userError?.message,
+  });
   const cleanNickname = sanitizeNickname(nickname);
 
   let room: Room | null = null;
