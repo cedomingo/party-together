@@ -254,6 +254,10 @@ export async function createRoom({
     );
   }
 
+  // TEMPORARY DIAGNOSTIC — remove once auth.uid() is confirmed working.
+  const { data: authDebug, error: authDebugError } = await supabase.rpc("debug_auth");
+  console.log("[DEBUG createRoom] auth.uid() as seen by Postgres:", authDebug, authDebugError);
+
   const { data: playerRow, error: playerError } = await supabase
     .from("players")
     .insert({
