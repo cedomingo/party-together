@@ -98,20 +98,35 @@ export async function POST(request: Request) {
   // point 1: "join order or randomized"; join order is simpler to reason
   // about and keeps "who's up next" predictable for players watching the
   // lobby fill up).
-  const { data: connectedPlayers, error: playersError } = await supabase
+  //
+  // Deliberately NOT filtered by `connected` here. `connected` is
+  // presence/UX state only (a status dot — see
+  // supabase/RECONNECT_VERIFICATION.md, "Who's online right now" row: it's
+  // explicitly ephemeral and reset on reconnect, never load-bearing for
+  // game state). It can be transiently false for a player who is very much
+  // still in the room — e.g. `pagehide` fires and flips it via
+  // sendBeacon() on a background tab-switch or screen lock, which can
+  // easily coincide with the exact moment everyone is tapping their phone
+  // to react to the host clicking Start. Filtering on it here silently
+  // dropped real participants from the round with no way to ever recover
+  // (nothing revisits this list after start). A player who genuinely isn't
+  // in the room yet is already excluded by definition (they have no row
+  // to select), and anyone joining *after* this point is already blocked
+  // separately (room leaves `lobby`, enforced by both the join route and
+  // RLS) — so this list is exactly "current room members," full stop.
+  const { data: roomPlayers, error: playersError } = await supabase
     .from("players")
     .select("id")
     .eq("room_id", roomId)
-    .eq("connected", true)
     .order("joined_at", { ascending: true });
 
   if (playersError) {
     return NextResponse.json({ error: playersError.message }, { status: 500 });
   }
 
-  const playerIds = (connectedPlayers ?? []).map((p) => p.id as string);
+  const playerIds = (roomPlayers ?? []).map((p) => p.id as string);
   if (playerIds.length === 0) {
-    return NextResponse.json({ error: "No connected players to start with." }, { status: 400 });
+    return NextResponse.json({ error: "No players in the room to start with." }, { status: 400 });
   }
 
   // Everything from here on is privileged: reading the full character

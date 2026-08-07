@@ -79,48 +79,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // DIAGNOSTIC (temporary): every static (RLS-bypassing) query on
-    // who_am_i_assignments has confirmed the row exists, belongs to
-    // callerPlayerId, for this exact sessionId. The only thing left
-    // unverified is what auth.uid() Postgres actually sees *at the moment
-    // of this specific request* — which may not match the identity
-    // getUser() resolved a few lines up in loadSessionForTurn, if a token
-    // refresh happened in between. debug_whoami() (see
-    // supabase/migrations/20260807140000_debug_whoami_temp.sql) echoes
-    // that back so we can compare directly instead of inferring it.
-    const { data: userDataForDebug } = await supabase.auth.getUser();
-    // DIAGNOSTIC (temporary), round 3: every previous check (auth.uid(),
-    // current_player_id_in_room(), row existence) came back correct — but
-    // each was its own separate request/connection. debug_guess_attempt()
-    // does identity resolution + the real update in ONE atomic
-    // statement/connection, as the caller's own privileges, ruling out any
-    // cross-request pooling explanation. See
-    // supabase/migrations/20260807140200_debug_guess_attempt_temp.sql.
-    const { data: atomicAttempt, error: atomicAttemptError } = await supabase.rpc(
-      "debug_guess_attempt",
-      { p_session_id: sessionId, p_character_id: characterId }
-    );
-    console.error("[guess debug] atomic identity+update in one connection", {
-      sessionId,
-      roomId,
-      callerPlayerId,
-      getUserId: userDataForDebug.user?.id ?? null,
-      atomicAttempt,
-      atomicAttemptError: atomicAttemptError?.message,
-    });
-
     // Record the guess. This is the ONLY write this route makes to
     // who_am_i_assignments, and the column grant means it's physically
     // impossible for it to touch character_id.
     //
-    // DIAGNOSTIC (temporary): chaining .select() here — restricted to the
-    // only two columns we actually have a SELECT grant on
+    // Chaining .select() here — restricted to the only two columns we
+    // actually have a SELECT grant on
     // (20260807090000_who_am_i_assignments_filter_grant.sql) — switches
     // PostgREST off `Prefer: return=minimal` and back to returning the
-    // affected row(s). Without this, a silent RLS/filter mismatch (0 rows
-    // matched) and a genuine success look byte-for-byte identical: no
-    // error either way. This is how we find out which one we're actually
-    // hitting.
+    // affected row(s). Without this, "0 rows matched, no error" (see the
+    // no-assignment-row branch below) and a genuine success look
+    // byte-for-byte identical over the wire, which is exactly what let
+    // that case go unnoticed for a while — keep this rather than trim it
+    // for a "smaller" query.
     const { data: guessUpdateRows, error: guessUpdateError } = await supabase
       .from("who_am_i_assignments")
       .update({ guessed_character_id: characterId })
@@ -136,17 +107,28 @@ export async function POST(request: Request) {
     }
 
     if (!guessUpdateRows || guessUpdateRows.length === 0) {
-      // No error, but nothing matched — either the row doesn't exist for
-      // this (sessionId, callerPlayerId) pair, or the update_own_row RLS
-      // policy's USING clause didn't match this caller. Surfacing this
-      // explicitly instead of silently proceeding (which is what happened
-      // before — return=minimal made this indistinguishable from success).
+      // No error, but nothing matched. Root-caused: this used to happen
+      // because start/route.ts only snapshotted players with
+      // `connected = true` at the instant Start was clicked, which could
+      // silently drop a real in-room player (e.g. a backgrounded tab
+      // flipping `connected` via pagehide/sendBeacon right at that
+      // moment — see supabase/RECONNECT_VERIFICATION.md). start/route.ts
+      // no longer filters by `connected` for exactly this reason, so this
+      // branch should now only be reachable for a genuinely late joiner.
+      // Keeping it as a real, honest branch (not a 500) rather than
+      // deleting it — a server-side log line here (not user-facing) means
+      // a recurrence still leaves a trace instead of needing another round
+      // of temporary debug infra.
+      console.error("[who-am-i guess] no assignment row for an in-turn caller", {
+        sessionId,
+        callerPlayerId,
+      });
       return NextResponse.json(
         {
           error:
-            "Your guess wasn't saved (no matching assignment row for this session/player under RLS). This is the bug — report it rather than retrying.",
+            "You don't have a character assigned for this round — you may have joined or reconnected after it started. Sit tight for the next round, or ask the host to check.",
         },
-        { status: 500 }
+        { status: 409 }
       );
     }
 
