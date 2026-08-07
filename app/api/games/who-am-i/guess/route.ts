@@ -82,17 +82,42 @@ export async function POST(request: Request) {
     // Record the guess. This is the ONLY write this route makes to
     // who_am_i_assignments, and the column grant means it's physically
     // impossible for it to touch character_id.
-    const { error: guessUpdateError } = await supabase
+    //
+    // DIAGNOSTIC (temporary): chaining .select() here — restricted to the
+    // only two columns we actually have a SELECT grant on
+    // (20260807090000_who_am_i_assignments_filter_grant.sql) — switches
+    // PostgREST off `Prefer: return=minimal` and back to returning the
+    // affected row(s). Without this, a silent RLS/filter mismatch (0 rows
+    // matched) and a genuine success look byte-for-byte identical: no
+    // error either way. This is how we find out which one we're actually
+    // hitting.
+    const { data: guessUpdateRows, error: guessUpdateError } = await supabase
       .from("who_am_i_assignments")
       .update({ guessed_character_id: characterId })
       .eq("session_id", sessionId)
-      .eq("player_id", callerPlayerId);
+      .eq("player_id", callerPlayerId)
+      .select("session_id, player_id");
 
     if (guessUpdateError) {
       // Most likely a bad characterId (FK violation) or a race where the
       // assignment row doesn't exist for some reason — either way, this
       // is the caller's fault, not a server error.
       return NextResponse.json({ error: guessUpdateError.message }, { status: 400 });
+    }
+
+    if (!guessUpdateRows || guessUpdateRows.length === 0) {
+      // No error, but nothing matched — either the row doesn't exist for
+      // this (sessionId, callerPlayerId) pair, or the update_own_row RLS
+      // policy's USING clause didn't match this caller. Surfacing this
+      // explicitly instead of silently proceeding (which is what happened
+      // before — return=minimal made this indistinguishable from success).
+      return NextResponse.json(
+        {
+          error:
+            "Your guess wasn't saved (no matching assignment row for this session/player under RLS). This is the bug — report it rather than retrying.",
+        },
+        { status: 500 }
+      );
     }
 
     // Read the result back through the masking view only — never touch
