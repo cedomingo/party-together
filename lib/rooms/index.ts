@@ -250,23 +250,19 @@ export async function createRoom({
     .single();
 
   if (playerError || !playerRow) {
-    throw new RoomError(playerError?.message ?? "Failed to create host player row.");
+    throw new RoomError(playerError?.message ?? "Failed to create the host's player row.");
   }
 
-  // Step 3 of the bootstrap sequence (see the docstring above): now that
-  // the host's player row exists, point the room at it. Best-effort in the
-  // sense that nothing else currently reads `host_player_id` (host status
-  // is driven by `players.is_host`, which is already set above) — but
-  // leaving it null forever defeats the point of the column and would
-  // surprise anything that starts relying on it later.
+  // Step 3 of the bootstrap sequence documented above — point the room at
+  // its host now that the host's player row exists. Covered by
+  // rooms_update_host_only (RLS): is_room_host(id) is satisfied because
+  // the row we just inserted has is_host = true and auth_id = auth.uid().
   const { error: hostLinkError } = await supabase
     .from("rooms")
     .update({ host_player_id: playerRow.id })
     .eq("id", room.id);
 
-  if (hostLinkError) {
-    throw new RoomError(hostLinkError.message);
-  }
+  if (hostLinkError) throw new RoomError(hostLinkError.message);
 
   return {
     roomId: room.id,
@@ -362,6 +358,15 @@ export async function joinRoomByCode(
     .insert({ room_id: room.id, nickname: cleanNickname, is_host: false })
     .select()
     .single();
+
+  console.log("[DEBUG joinRoomByCode] player insert failed", {
+    code: insertError?.code,
+    message: insertError?.message,
+    details: insertError?.details,
+    hint: insertError?.hint,
+    roomId: room.id,
+    userId,
+  });
 
   if (insertError || !playerRow) {
     // The RLS guard above can also reject this insert directly (a race
