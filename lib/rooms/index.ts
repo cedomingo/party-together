@@ -282,6 +282,14 @@ export async function createRoom({
     .select()
     .single();
 
+  console.log("[DEBUG createRoom] player insert result", {
+    success: !!playerRow,
+    code: playerError?.code,
+    message: playerError?.message,
+    details: playerError?.details,
+    hint: playerError?.hint,
+  });
+
   if (playerError || !playerRow) {
     throw new RoomError(playerError?.message ?? "Failed to create the host's player row.");
   }
