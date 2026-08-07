@@ -111,6 +111,29 @@ export async function POST(request: Request) {
     const nextState = submitGuess(state, callerPlayerId, correct);
     await saveTurnState(supabase, sessionId, nextState);
 
+    // Log the guess in `questions_log` — SPEC.md §8 point 6 treats
+    // guessing as a first-class turn action, so it belongs in the same
+    // shared log every other player already scrolls through, the same as
+    // an asked question. This never touches the caller's own (secret)
+    // character_id: `characterId` here is only ever the character the
+    // guesser themselves picked, and `correct`/`is_guessed` was already
+    // resolved above without this route ever selecting character_id
+    // directly. Best-effort — a failure here shouldn't fail the guess
+    // itself, since the guess has already been recorded and the turn
+    // state already advanced.
+    const { error: logError } = await supabase.from("questions_log").insert({
+      session_id: sessionId,
+      asking_player_id: callerPlayerId,
+      question_text: correct ? "Guessed their identity — correct!" : "Guessed their identity — not quite.",
+      is_guess: true,
+      guessed_character_id: characterId,
+      answers: { [callerPlayerId]: correct ? "correct" : "incorrect" },
+      resolved: true,
+    });
+    if (logError) {
+      console.error("Failed to log guess in questions_log:", logError.message);
+    }
+
     let gameEnded = false;
     if (correct && isGameFullySolved(nextState)) {
       // System-detected end condition, not a host action — see the doc

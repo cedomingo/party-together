@@ -21,6 +21,7 @@ import {
 } from "@/app/api/games/who-am-i/_lib/turnSession";
 import { TurnStateError, advanceAfterAnswer, currentResponderId } from "@/games/who-am-i/logic/turnState";
 import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
+import { stripUnsafeChars } from "@/lib/rooms";
 
 // SPEC.md §10: "rate-limit ... answer submissions server-side ... to
 // prevent spam-turn abuse." Same reasoning as question/route.ts — keyed by
@@ -29,10 +30,33 @@ import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
 const LIMIT = 20;
 const WINDOW_SECONDS = 60;
 
-type AnswerValue = "yes" | "no";
+// A responder isn't limited to "yes"/"no" — they can also type a free-text
+// answer ("Other...") for cases a strict yes/no can't cover ("kind of",
+// "depends", a clarifying detail, etc). `questions_log.answers` is an
+// unconstrained jsonb map (see supabase/migrations/
+// ..._who_am_i_guess_log_and_free_text_answers.sql), so this is purely an
+// application-layer validation choice, not a schema one.
+const MAX_ANSWER_LENGTH = 140;
+
+type AnswerValue = "yes" | "no" | string;
 
 function isAnswerValue(value: unknown): value is AnswerValue {
-  return value === "yes" || value === "no";
+  return typeof value === "string" && value.length > 0;
+}
+
+/**
+ * "yes"/"no" pass straight through untouched. Anything else is a free-text
+ * "Other" answer — sanitize it the same way question text is sanitized
+ * (strip unsafe chars, collapse whitespace, cap length) before it ever
+ * reaches the DB.
+ */
+function normalizeAnswer(raw: string): AnswerValue {
+  if (raw === "yes" || raw === "no") return raw;
+  const cleaned = stripUnsafeChars(raw).replace(/\s+/g, " ").trim().slice(0, MAX_ANSWER_LENGTH);
+  if (cleaned.length < 1) {
+    throw new TurnRequestError("Answer must be between 1 and 140 characters.", 400);
+  }
+  return cleaned;
 }
 
 export async function POST(request: Request) {
@@ -48,10 +72,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "sessionId (string) is required." }, { status: 400 });
   }
   if (!isAnswerValue(answer)) {
-    return NextResponse.json({ error: 'answer must be "yes" or "no".' }, { status: 400 });
+    return NextResponse.json({ error: "answer must be a non-empty string." }, { status: 400 });
   }
 
   try {
+    const cleanAnswer = normalizeAnswer(answer);
     const { supabase, callerPlayerId, state } = await loadSessionForTurn(sessionId);
 
     await enforceRateLimit({
@@ -101,7 +126,7 @@ export async function POST(request: Request) {
     const { error: updateError } = await supabase
       .from("questions_log")
       .update({
-        answers: { ...existingAnswers, [callerPlayerId]: answer },
+        answers: { ...existingAnswers, [callerPlayerId]: cleanAnswer },
         resolved: nowResolved,
       })
       .eq("id", state.activeQuestionId);

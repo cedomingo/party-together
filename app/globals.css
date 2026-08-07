@@ -399,6 +399,75 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* "Who Am I?" — Players panel: everyone else's live character card
+   (SPEC.md §7 — "each player is secretly assigned a character identity
+   that only *other* players can see"). Deliberately reuses the same
+   card-image treatment as `.who-am-i-card` / `.who-am-i-recap-image` so
+   an opponent's revealed card and your own hidden elimination-board tile
+   read as the same visual language. */
+.who-am-i-players {
+  margin-top: 1.5rem;
+}
+
+.who-am-i-players h2 {
+  margin: 0 0 0.35rem;
+}
+
+.who-am-i-players-grid {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.65rem;
+}
+
+.who-am-i-player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.who-am-i-player-card-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.who-am-i-player-card-image img {
+  object-fit: cover;
+}
+
+.who-am-i-player-card-hidden {
+  font-size: 1.5rem;
+  font-weight: 700;
+  opacity: 0.35;
+}
+
+.who-am-i-player-card-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.who-am-i-player-card-character {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
 /* "Who Am I?" — Turn Loop & Question Log (SPEC.md §8 "Turn Loop", §5
    questions_log). */
 .who-am-i-turn {
@@ -533,6 +602,29 @@ button:disabled {
   gap: 0 0.75rem;
   font-size: 0.85rem;
   opacity: 0.8;
+}
+
+.who-am-i-log-entry-guess {
+  border-style: dashed;
+}
+
+/* "Who Am I?" — Yes/No/Other answer control (SPEC.md §8 point 3 — a
+   responder isn't always limited to a strict yes/no). */
+.who-am-i-other-answer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-am-i-other-answer-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.who-am-i-other-answer-actions button[type="button"] {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: inherit;
 }
 
 /* "Who Am I?" — guess-your-identity + host "End Game" controls
@@ -710,5 +802,21 @@ button:disabled {
 
   .room-header button {
     width: 100%;
+  }
+
+  /* Yes/No/Other is now three buttons in that same row (previously just
+     Yes/No) — `flex: 1` above still shares the row evenly, but on the
+     narrowest phones three roughly-equal buttons plus their labels can
+     get tight, so let the row wrap rather than squeeze. */
+  .who-am-i-answer-buttons {
+    flex-wrap: wrap;
+  }
+
+  .who-am-i-answer-buttons button {
+    min-width: 5.5rem;
+  }
+
+  .who-am-i-other-answer-actions {
+    flex-direction: column;
   }
 }

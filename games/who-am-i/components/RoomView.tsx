@@ -84,14 +84,45 @@ interface OwnBoardRow {
   crossed_off_character_ids: string[] | null;
 }
 
+/**
+ * Shape of a `who_am_i_board` row fetched for the WHOLE session (every
+ * player, not just the caller's own row) during an in-progress game. The
+ * view (supabase/migrations/..._who_am_i_identity_protection.sql) only
+ * ever nulls out `character_id` for the row belonging to the CALLER —
+ * every other player's row already comes back with their real
+ * character_id, live, for the whole session. This is exactly SPEC.md §7's
+ * "each player is secretly assigned a character identity that only
+ * *other* players can see" — this component just wasn't reading it before.
+ */
+interface OpponentBoardRow {
+  session_id: string;
+  player_id: string;
+  character_id: string | null;
+}
+
+type AnswerValue = "yes" | "no" | string;
+
 interface QuestionLogRow {
   id: string;
   session_id: string;
   asking_player_id: string;
   question_text: string;
   created_at: string;
-  answers: Record<string, "yes" | "no">;
+  answers: Record<string, AnswerValue>;
   resolved: boolean;
+  /** True when this entry records a guess rather than an asked question
+   * (SPEC.md §8 point 6 — guessing counts as a turn action, logged the
+   * same way a question is). See supabase/migrations/
+   * ..._who_am_i_guess_log_and_free_text_answers.sql. */
+  is_guess: boolean;
+  /** Only set when is_guess is true — the character the guesser picked. */
+  guessed_character_id: string | null;
+}
+
+function formatAnswer(value: AnswerValue): string {
+  if (value === "yes") return "Yes";
+  if (value === "no") return "No";
+  return `"${value}"`;
 }
 
 /**
@@ -121,6 +152,15 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [crossedOff, setCrossedOff] = useState<Set<string>>(new Set());
+  // Every OTHER player's live character assignment (SPEC.md §7 — see
+  // OpponentBoardRow above). Keyed by player_id; the caller's own id will
+  // simply be absent/null since who_am_i_board nulls that row out.
+  const [opponentCharacterByPlayer, setOpponentCharacterByPlayer] = useState<
+    Map<string, string | null>
+  >(new Map());
+  // ---- yes/no/other answer draft --------------------------------------
+  const [answerMode, setAnswerMode] = useState<"choose" | "other">("choose");
+  const [otherAnswerDraft, setOtherAnswerDraft] = useState("");
 
   // ---- turn loop state (SPEC.md §8 "Turn Loop") --------------------------
   const [turnState, setTurnState] = useState<WhoAmITurnState | null>(null);
@@ -200,10 +240,15 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
 
         // Full public question log for this session (questions_log_select_
         // room_members RLS policy), oldest first so it reads top-to-bottom
-        // as a scrollable history (SPEC.md §8 "Chat/Log").
+        // as a scrollable history (SPEC.md §8 "Chat/Log"). Includes
+        // is_guess/guessed_character_id so a guess renders as its own kind
+        // of log entry (SPEC.md §8 point 6 — guessing counts as a turn
+        // action, same as asking).
         const { data: questionRows, error: questionsError } = await supabase
           .from("questions_log")
-          .select("id, session_id, asking_player_id, question_text, created_at, answers, resolved")
+          .select(
+            "id, session_id, asking_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
+          )
           .eq("session_id", sessionRow.id)
           .order("created_at", { ascending: true });
         if (questionsError) throw new Error(questionsError.message);
@@ -211,8 +256,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
         setQuestions((questionRows ?? []) as QuestionLogRow[]);
 
         // The masking view — see file header. Selects only the columns we
-        // actually need; character_id is never requested, so there's no
-        // path (buggy or not) where this component could surface it.
+        // actually need; character_id is never requested for OUR OWN row,
+        // so there's no path (buggy or not) where this component could
+        // surface it for ourselves.
         const { data: boardRow, error: boardError } = await supabase
           .from("who_am_i_board")
           .select("session_id, player_id, crossed_off_character_ids")
@@ -220,8 +266,27 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
           .eq("player_id", currentPlayer.id)
           .maybeSingle();
         if (boardError) throw new Error(boardError.message);
-
         if (cancelled) return;
+
+        // Every OTHER player's live character (SPEC.md §7). Fetched for
+        // the whole session, not filtered to a single player_id — the
+        // view nulls out only the CALLER's own row, so this always comes
+        // back with everyone else's real character_id already attached.
+        // Fetched even if WE joined without an assignment of our own (no
+        // `boardRow` below) — a late joiner should still get to see
+        // everyone else's cards to help narrow things down.
+        const { data: opponentRows, error: opponentError } = await supabase
+          .from("who_am_i_board")
+          .select("session_id, player_id, character_id")
+          .eq("session_id", sessionRow.id);
+        if (opponentError) throw new Error(opponentError.message);
+        if (cancelled) return;
+        setOpponentCharacterByPlayer(
+          new Map(
+            ((opponentRows ?? []) as OpponentBoardRow[]).map((row) => [row.player_id, row.character_id])
+          )
+        );
+
         if (!boardRow) {
           // Joined after this session's assignment ran (e.g. connected
           // after the host started the game) — no character was assigned
@@ -356,7 +421,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
 
         const { data: questionRows } = await supabase
           .from("questions_log")
-          .select("id, session_id, asking_player_id, question_text, created_at, answers, resolved")
+          .select(
+            "id, session_id, asking_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
+          )
           .eq("session_id", sessionId)
           .order("created_at", { ascending: true });
         if (questionRows) setQuestions(questionRows as QuestionLogRow[]);
@@ -499,8 +566,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     }
   }
 
-  async function submitAnswer(answer: "yes" | "no") {
+  async function submitAnswer(answer: AnswerValue) {
     if (!sessionId) return;
+    if (typeof answer === "string" && answer.trim().length === 0) return;
     setAnswering(true);
     setAnswerError(null);
     try {
@@ -516,11 +584,20 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
         broadcastTurnSync(payload.state);
       }
       broadcastTurnEvent("answer-submitted");
+      setAnswerMode("choose");
+      setOtherAnswerDraft("");
     } catch (err) {
       setAnswerError(err instanceof Error ? err.message : "Failed to submit answer.");
     } finally {
       setAnswering(false);
     }
+  }
+
+  function submitOtherAnswer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = otherAnswerDraft.trim();
+    if (trimmed.length === 0) return;
+    void submitAnswer(trimmed);
   }
 
   async function submitDone() {
@@ -694,6 +771,26 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
       });
   }, [turnState, recapRows, characters, players, currentPlayer.id]);
 
+  // ---- recap question log (SPEC.md §8 point 7) ---------------------------
+  // Same `questions` the in-progress log already renders, reshaped for
+  // <WhoAmIRecap>: guess entries get their guessed character's name
+  // resolved here (from the already-public `characters` roster) rather
+  // than making the recap component do its own character lookup.
+  const recapQuestions = useMemo(
+    () =>
+      questions.map((q) => ({
+        id: q.id,
+        asking_player_id: q.asking_player_id,
+        question_text: q.question_text,
+        answers: q.answers,
+        is_guess: q.is_guess,
+        guessedCharacterName: q.guessed_character_id
+          ? (characters.find((c) => c.id === q.guessed_character_id)?.name ?? null)
+          : null,
+      })),
+    [questions, characters]
+  );
+
   // ------------------------------------------------------------- render --
 
   if (state === "loading") {
@@ -719,7 +816,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     return (
       <WhoAmIRecap
         entries={recapEntries}
-        questions={questions}
+        questions={recapQuestions}
         nicknameFor={nicknameFor}
         loading={recapLoading}
         error={recapError}
@@ -886,24 +983,64 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                   {activeQuestion.question_text}
                 </p>
                 {isMyTurnToAnswer ? (
-                  <div className="who-am-i-answer-buttons">
-                    <button
-                      type="button"
-                      onClick={() => submitAnswer("yes")}
-                      disabled={answering}
-                      aria-label="Answer yes"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => submitAnswer("no")}
-                      disabled={answering}
-                      aria-label="Answer no"
-                    >
-                      No
-                    </button>
-                  </div>
+                  answerMode === "choose" ? (
+                    <div className="who-am-i-answer-buttons">
+                      <button
+                        type="button"
+                        onClick={() => submitAnswer("yes")}
+                        disabled={answering}
+                        aria-label="Answer yes"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitAnswer("no")}
+                        disabled={answering}
+                        aria-label="Answer no"
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAnswerMode("other")}
+                        disabled={answering}
+                        aria-label="Type a different answer"
+                      >
+                        Other…
+                      </button>
+                    </div>
+                  ) : (
+                    <form className="who-am-i-other-answer-form" onSubmit={submitOtherAnswer}>
+                      <label className="field">
+                        <span>Type your answer</span>
+                        <input
+                          value={otherAnswerDraft}
+                          onChange={(e) => setOtherAnswerDraft(e.target.value)}
+                          maxLength={140}
+                          required
+                          placeholder="e.g. Kind of, depends…"
+                          autoComplete="off"
+                          autoFocus
+                        />
+                      </label>
+                      <div className="who-am-i-other-answer-actions">
+                        <button type="submit" disabled={answering || otherAnswerDraft.trim().length === 0}>
+                          {answering ? "Sending…" : "Send answer"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAnswerMode("choose");
+                            setOtherAnswerDraft("");
+                          }}
+                          disabled={answering}
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </form>
+                  )
                 ) : (
                   <p className="muted">
                     {nicknameFor(responderId ?? "")} is answering next.
@@ -926,7 +1063,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                 <ul className="who-am-i-answer-summary">
                   {Object.entries(activeQuestion.answers).map(([playerId, answer]) => (
                     <li key={playerId}>
-                      {nicknameFor(playerId)}: <strong>{answer === "yes" ? "Yes" : "No"}</strong>
+                      {nicknameFor(playerId)}: <strong>{formatAnswer(answer)}</strong>
                     </li>
                   ))}
                 </ul>
@@ -951,26 +1088,94 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
           <div className="who-am-i-log">
             <h3>Question log</h3>
             <ul className="who-am-i-log-list">
-              {questions.map((q) => (
-                <li key={q.id} className="who-am-i-log-entry">
-                  <p className="who-am-i-log-question">
-                    <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
-                  </p>
-                  {Object.keys(q.answers).length > 0 && (
-                    <ul className="who-am-i-log-answers">
-                      {Object.entries(q.answers).map(([playerId, answer]) => (
-                        <li key={playerId}>
-                          {nicknameFor(playerId)}: {answer === "yes" ? "Yes" : "No"}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {!q.resolved && <span className="muted">Still being answered…</span>}
-                </li>
-              ))}
+              {questions.map((q) => {
+                // A guess counts as a question in this log (SPEC.md §8
+                // point 6) — it's rendered as its own kind of entry rather
+                // than a normal ask/answer round, since it's already
+                // resolved the instant it's logged (see guess/route.ts).
+                if (q.is_guess) {
+                  const guessedName = q.guessed_character_id
+                    ? (characters.find((c) => c.id === q.guessed_character_id)?.name ?? "a character")
+                    : "a character";
+                  const wasCorrect = q.answers[q.asking_player_id] === "correct";
+                  return (
+                    <li key={q.id} className="who-am-i-log-entry who-am-i-log-entry-guess">
+                      <p className="who-am-i-log-question">
+                        <strong>{nicknameFor(q.asking_player_id)}</strong> guessed{" "}
+                        <strong>{guessedName}</strong> —{" "}
+                        <span
+                          className={
+                            wasCorrect
+                              ? "who-am-i-guess-result-correct"
+                              : "who-am-i-guess-result-incorrect"
+                          }
+                        >
+                          {wasCorrect ? "Correct!" : "Incorrect"}
+                        </span>
+                      </p>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={q.id} className="who-am-i-log-entry">
+                    <p className="who-am-i-log-question">
+                      <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
+                    </p>
+                    {Object.keys(q.answers).length > 0 && (
+                      <ul className="who-am-i-log-answers">
+                        {Object.entries(q.answers).map(([playerId, answer]) => (
+                          <li key={playerId}>
+                            {nicknameFor(playerId)}: {formatAnswer(answer)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!q.resolved && <span className="muted">Still being answered…</span>}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="who-am-i-players-heading" className="who-am-i-players">
+        <h2 id="who-am-i-players-heading">Players</h2>
+        <p className="muted">
+          You can see everyone else&rsquo;s secret character — use it to answer their questions.
+          Only your own stays hidden.
+        </p>
+        <ul className="who-am-i-players-grid" role="list">
+          {players.map((player) => {
+            const isYou = player.id === currentPlayer.id;
+            const characterId = opponentCharacterByPlayer.get(player.id) ?? null;
+            const character = characterId ? characters.find((c) => c.id === characterId) : undefined;
+            const hasSolvedTheirs = turnState?.solvedPlayerIds.includes(player.id) ?? false;
+            return (
+              <li key={player.id} className="who-am-i-player-card">
+                <span className="who-am-i-player-card-image">
+                  {character ? (
+                    <Image src={character.image_url} alt="" fill sizes="72px" />
+                  ) : (
+                    <span className="who-am-i-player-card-hidden" aria-hidden="true">
+                      ?
+                    </span>
+                  )}
+                </span>
+                <span className="who-am-i-player-card-name">
+                  {player.nickname}
+                  {isYou ? " (you)" : ""}
+                </span>
+                <span className="who-am-i-player-card-character muted">
+                  {isYou
+                    ? "Hidden from you"
+                    : (character?.name ?? (state === "no-assignment" ? "No character" : "…"))}
+                  {hasSolvedTheirs ? " · Solved!" : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       <section aria-labelledby="who-am-i-board-heading" className="who-am-i-board">

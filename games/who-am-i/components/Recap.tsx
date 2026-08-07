@@ -32,7 +32,11 @@ export interface WhoAmIRecapQuestion {
   id: string;
   asking_player_id: string;
   question_text: string;
-  answers: Record<string, "yes" | "no">;
+  answers: Record<string, string>;
+  /** True when this entry records a guess rather than an asked question
+   * (SPEC.md §8 point 6) — mirrors RoomView's questions_log shape. */
+  is_guess?: boolean;
+  guessedCharacterName?: string | null;
 }
 
 interface WhoAmIRecapProps {
@@ -117,22 +121,42 @@ export function WhoAmIRecap({ entries, questions, nicknameFor, loading, error }:
         <div className="who-am-i-log who-am-i-recap-log">
           <h3>Full question log</h3>
           <ul className="who-am-i-log-list">
-            {questions.map((q) => (
-              <li key={q.id} className="who-am-i-log-entry">
-                <p className="who-am-i-log-question">
-                  <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
-                </p>
-                {Object.keys(q.answers).length > 0 && (
-                  <ul className="who-am-i-log-answers">
-                    {Object.entries(q.answers).map(([playerId, answer]) => (
-                      <li key={playerId}>
-                        {nicknameFor(playerId)}: {answer === "yes" ? "Yes" : "No"}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
+            {questions.map((q) => {
+              if (q.is_guess) {
+                const wasCorrect = q.answers[q.asking_player_id] === "correct";
+                return (
+                  <li key={q.id} className="who-am-i-log-entry who-am-i-log-entry-guess">
+                    <p className="who-am-i-log-question">
+                      <strong>{nicknameFor(q.asking_player_id)}</strong> guessed{" "}
+                      <strong>{q.guessedCharacterName ?? "a character"}</strong> —{" "}
+                      <span
+                        className={
+                          wasCorrect ? "who-am-i-guess-result-correct" : "who-am-i-guess-result-incorrect"
+                        }
+                      >
+                        {wasCorrect ? "Correct!" : "Incorrect"}
+                      </span>
+                    </p>
+                  </li>
+                );
+              }
+              return (
+                <li key={q.id} className="who-am-i-log-entry">
+                  <p className="who-am-i-log-question">
+                    <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
+                  </p>
+                  {Object.keys(q.answers).length > 0 && (
+                    <ul className="who-am-i-log-answers">
+                      {Object.entries(q.answers).map(([playerId, answer]) => (
+                        <li key={playerId}>
+                          {nicknameFor(playerId)}: {answer === "yes" ? "Yes" : answer === "no" ? "No" : `"${answer}"`}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
