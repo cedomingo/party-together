@@ -89,29 +89,24 @@ export async function POST(request: Request) {
     // supabase/migrations/20260807140000_debug_whoami_temp.sql) echoes
     // that back so we can compare directly instead of inferring it.
     const { data: userDataForDebug } = await supabase.auth.getUser();
-    const { data: whoamiRows, error: whoamiError } = await supabase.rpc("debug_whoami");
-    // DIAGNOSTIC (temporary), round 2: identity checks out clean (see
-    // debug_whoami above), and every static row-level fact checks out too
-    // (assignment row exists, right player, right session) — yet the
-    // UPDATE still silently matches 0 rows. Since USING (not WITH CHECK)
-    // is what's failing here (a WITH CHECK failure would throw a real RLS
-    // error, not a silent no-op), the remaining suspect is
-    // current_player_id_in_room() itself returning something unexpected
-    // *in this exact request context*, despite auth.uid() resolving
-    // correctly. Call it directly, live, the same way the policy does.
-    const { data: currentPlayerIdLive, error: currentPlayerIdError } = await supabase.rpc(
-      "current_player_id_in_room",
-      { target_room_id: roomId }
+    // DIAGNOSTIC (temporary), round 3: every previous check (auth.uid(),
+    // current_player_id_in_room(), row existence) came back correct — but
+    // each was its own separate request/connection. debug_guess_attempt()
+    // does identity resolution + the real update in ONE atomic
+    // statement/connection, as the caller's own privileges, ruling out any
+    // cross-request pooling explanation. See
+    // supabase/migrations/20260807140200_debug_guess_attempt_temp.sql.
+    const { data: atomicAttempt, error: atomicAttemptError } = await supabase.rpc(
+      "debug_guess_attempt",
+      { p_session_id: sessionId, p_character_id: characterId }
     );
-    console.error("[guess debug] getUser().id vs live auth.uid()", {
+    console.error("[guess debug] atomic identity+update in one connection", {
       sessionId,
       roomId,
       callerPlayerId,
       getUserId: userDataForDebug.user?.id ?? null,
-      whoami: whoamiRows,
-      whoamiError: whoamiError?.message,
-      currentPlayerIdLive,
-      currentPlayerIdError: currentPlayerIdError?.message,
+      atomicAttempt,
+      atomicAttemptError: atomicAttemptError?.message,
     });
 
     // Record the guess. This is the ONLY write this route makes to
