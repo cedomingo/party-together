@@ -79,6 +79,25 @@ export async function POST(request: Request) {
       );
     }
 
+    // DIAGNOSTIC (temporary): every static (RLS-bypassing) query on
+    // who_am_i_assignments has confirmed the row exists, belongs to
+    // callerPlayerId, for this exact sessionId. The only thing left
+    // unverified is what auth.uid() Postgres actually sees *at the moment
+    // of this specific request* — which may not match the identity
+    // getUser() resolved a few lines up in loadSessionForTurn, if a token
+    // refresh happened in between. debug_whoami() (see
+    // supabase/migrations/20260807140000_debug_whoami_temp.sql) echoes
+    // that back so we can compare directly instead of inferring it.
+    const { data: userDataForDebug } = await supabase.auth.getUser();
+    const { data: whoamiRows, error: whoamiError } = await supabase.rpc("debug_whoami");
+    console.error("[guess debug] getUser().id vs live auth.uid()", {
+      sessionId,
+      callerPlayerId,
+      getUserId: userDataForDebug.user?.id ?? null,
+      whoami: whoamiRows,
+      whoamiError: whoamiError?.message,
+    });
+
     // Record the guess. This is the ONLY write this route makes to
     // who_am_i_assignments, and the column grant means it's physically
     // impossible for it to touch character_id.
