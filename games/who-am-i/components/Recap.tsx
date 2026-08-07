@@ -14,6 +14,7 @@
 // effects, gated on `endedAt`) rather than duplicated into this file.
 
 import Image from "next/image";
+import type { WhoAmIGameMode } from "@/games/who-am-i/logic/turnState";
 
 export interface WhoAmIRecapEntry {
   playerId: string;
@@ -45,11 +46,34 @@ interface WhoAmIRecapProps {
   nicknameFor: (playerId: string) => string;
   loading: boolean;
   error: string | null;
+  /**
+   * Win-condition variant for this session, and the outcome it produced
+   * (turnState.ts `getGameOutcome`) — null/empty when the session hasn't
+   * actually reached a mode-defined game-over state (e.g. the host ended
+   * the round manually while multiple players were still unsolved), in
+   * which case this just falls back to the plain "who solved it" list
+   * below with no winner/loser banner.
+   */
+  gameMode?: WhoAmIGameMode | null;
+  winnerPlayerIds?: string[];
+  loserPlayerIds?: string[];
 }
 
-export function WhoAmIRecap({ entries, questions, nicknameFor, loading, error }: WhoAmIRecapProps) {
+export function WhoAmIRecap({
+  entries,
+  questions,
+  nicknameFor,
+  loading,
+  error,
+  gameMode = null,
+  winnerPlayerIds = [],
+  loserPlayerIds = [],
+}: WhoAmIRecapProps) {
   const solved = entries.filter((entry) => entry.rank !== null);
   const unsolved = entries.filter((entry) => entry.rank === null);
+  const winnerSet = new Set(winnerPlayerIds);
+  const loserSet = new Set(loserPlayerIds);
+  const hasOutcome = winnerPlayerIds.length > 0 || loserPlayerIds.length > 0;
 
   return (
     <section aria-labelledby="who-am-i-recap-heading" className="who-am-i-recap">
@@ -57,6 +81,19 @@ export function WhoAmIRecap({ entries, questions, nicknameFor, loading, error }:
       <p className="muted">
         The game has ended. Here&rsquo;s who figured out who they were, and in what order.
       </p>
+
+      {hasOutcome && gameMode === "first-out-wins" && (
+        <p className="who-am-i-recap-outcome">
+          <strong>{nicknameFor(winnerPlayerIds[0]!)}</strong> was first to guess correctly and wins!
+        </p>
+      )}
+      {hasOutcome && gameMode === "last-standing-loses" && loserPlayerIds.length > 0 && (
+        <p className="who-am-i-recap-outcome">
+          <strong>{loserPlayerIds.map((id) => nicknameFor(id)).join(", ")}</strong>{" "}
+          {loserPlayerIds.length === 1 ? "was" : "were"} the last one standing and{" "}
+          {loserPlayerIds.length === 1 ? "loses" : "lose"}.
+        </p>
+      )}
 
       {error && (
         <p className="field-error" role="alert">
@@ -87,6 +124,9 @@ export function WhoAmIRecap({ entries, questions, nicknameFor, loading, error }:
                     </strong>
                     <span className="muted">was {entry.characterName ?? "Unknown"}</span>
                   </span>
+                  {winnerSet.has(entry.playerId) && (
+                    <span className="badge who-am-i-recap-winner-badge">Winner</span>
+                  )}
                 </li>
               ))}
             </ol>
@@ -109,6 +149,9 @@ export function WhoAmIRecap({ entries, questions, nicknameFor, loading, error }:
                       {entry.guessedCharacterName &&
                         ` \u2014 last guessed ${entry.guessedCharacterName}`}
                     </span>
+                    {loserSet.has(entry.playerId) && (
+                      <span className="badge who-am-i-recap-loser-badge">Loser</span>
+                    )}
                   </li>
                 ))}
               </ul>

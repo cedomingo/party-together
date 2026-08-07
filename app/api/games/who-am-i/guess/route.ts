@@ -35,7 +35,7 @@ import {
 import {
   TurnStateError,
   currentAskerId,
-  isGameFullySolved,
+  isGameOver,
   submitGuess,
 } from "@/games/who-am-i/logic/turnState";
 
@@ -134,8 +134,12 @@ export async function POST(request: Request) {
       console.error("Failed to log guess in questions_log:", logError.message);
     }
 
+    // Mode-aware: "first-out-wins" ends the game on the very first correct
+    // guess; "last-standing-loses" (the default) keeps going until only one
+    // unsolved player remains. See games/who-am-i/logic/turnState.ts
+    // `isGameOver` for the per-mode rule.
     let gameEnded = false;
-    if (correct && isGameFullySolved(nextState)) {
+    if (correct && isGameOver(nextState)) {
       // System-detected end condition, not a host action — see the doc
       // comment on `endGameSession` for why this specifically needs the
       // admin client rather than the caller's own scoped one.

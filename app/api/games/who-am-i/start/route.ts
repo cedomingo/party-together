@@ -23,10 +23,23 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assignCharacters, AssignmentError } from "@/games/who-am-i/logic/assignCharacters";
-import { initialTurnState } from "@/games/who-am-i/logic/turnState";
+import {
+  DEFAULT_GAME_MODE,
+  initialTurnState,
+  type WhoAmIGameMode,
+} from "@/games/who-am-i/logic/turnState";
+
+function parseGameMode(value: unknown): WhoAmIGameMode {
+  // Trusted server-side validation of the host's lobby checkbox (see
+  // games/who-am-i/config.ts `LobbyOptions`) — anything other than the
+  // exact "first-out-wins" string falls back to the default "normal" mode
+  // rather than erroring, so a stale client / missing field never blocks
+  // starting the game.
+  return value === "first-out-wins" ? "first-out-wins" : DEFAULT_GAME_MODE;
+}
 
 export async function POST(request: Request) {
-  let body: { roomId?: unknown };
+  let body: { roomId?: unknown; gameMode?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -37,6 +50,7 @@ export async function POST(request: Request) {
   if (typeof roomId !== "string" || roomId.length === 0) {
     return NextResponse.json({ error: "roomId (string) is required." }, { status: 400 });
   }
+  const requestedGameMode = parseGameMode(body.gameMode);
 
   const supabase = await createSupabaseServerClient();
 
@@ -139,7 +153,7 @@ export async function POST(request: Request) {
       room_id: roomId,
       game_id: "who-am-i",
       started_at: new Date().toISOString(),
-      state: initialTurnState(playerIds),
+      state: initialTurnState(playerIds, requestedGameMode),
     })
     .select("id")
     .single();

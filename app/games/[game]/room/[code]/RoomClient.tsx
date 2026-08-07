@@ -56,6 +56,15 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [starting, setStarting] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy invite link");
 
+  // Opaque host-set lobby config for whichever game is active (e.g. "Who Am
+  // I?"'s win-condition checkbox) — see GameConfig.LobbyOptions/
+  // defaultLobbyOptions/onStart in lib/games-registry.ts. RoomClient never
+  // looks inside this value, just seeds/threads it through.
+  const [lobbyOptions, setLobbyOptions] = useState<unknown>(gameConfig?.defaultLobbyOptions);
+  useEffect(() => {
+    setLobbyOptions(gameConfig?.defaultLobbyOptions);
+  }, [gameConfig?.defaultLobbyOptions]);
+
   const currentPlayer = useMemo(
     () => players.find((p) => p.auth_id === userId) ?? null,
     [players, userId]
@@ -286,7 +295,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
       // it just calls whatever the registry handed back, or falls back to
       // the generic core stub for games that don't need anything special.
       if (gameConfig?.onStart) {
-        await gameConfig.onStart(supabase, room);
+        await gameConfig.onStart(supabase, room, lobbyOptions);
       } else {
         await startGame(supabase, room.id);
       }
@@ -379,6 +388,13 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
           <section>
             {currentPlayer.is_host ? (
               <>
+                {gameConfig?.LobbyOptions && (
+                  <gameConfig.LobbyOptions
+                    players={players}
+                    value={lobbyOptions}
+                    onChange={setLobbyOptions}
+                  />
+                )}
                 <button type="button" onClick={handleStartGame} disabled={starting}>
                   {starting ? "Starting…" : "Start Game"}
                 </button>

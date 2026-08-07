@@ -62,6 +62,7 @@ import type { GameRoomViewProps } from "@/lib/games-registry";
 import {
   currentAskerId,
   currentResponderId,
+  getGameOutcome,
   isWhoAmITurnState,
   type WhoAmITurnState,
 } from "@/games/who-am-i/logic/turnState";
@@ -813,6 +814,12 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   // is handed off entirely to the recap; the turn loop / board below is
   // for an in-progress session only.
   if (endedAt) {
+    // Mode-aware win/loss framing (turnState.ts `getGameOutcome`) — a host
+    // manually ending the round early (app/api/games/who-am-i/end/route.ts)
+    // means `turnState` might not actually satisfy `isGameOver` yet, in
+    // which case `getGameOutcome` returns empty winner/loser lists and
+    // <WhoAmIRecap> just falls back to its plain "who solved it" listing.
+    const outcome = turnState ? getGameOutcome(turnState) : null;
     return (
       <WhoAmIRecap
         entries={recapEntries}
@@ -820,6 +827,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
         nicknameFor={nicknameFor}
         loading={recapLoading}
         error={recapError}
+        gameMode={turnState?.gameMode ?? null}
+        winnerPlayerIds={outcome?.winnerPlayerIds ?? []}
+        loserPlayerIds={outcome?.loserPlayerIds ?? []}
       />
     );
   }

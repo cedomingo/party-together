@@ -23,6 +23,30 @@
 
 export type WhoAmITurnPhase = "asking" | "answering" | "reviewing";
 
+/**
+ * Win-condition variant, chosen by the host in the lobby before the game
+ * starts (see the "First One Out Wins?" checkbox — games/who-am-i/config.ts
+ * `LobbyOptions`) and fixed for the whole session, same as `turnOrder`.
+ *
+ * - "last-standing-loses" (the default/"Normal" mode): play continues
+ *   until every player but one has correctly guessed their character —
+ *   that single remaining unsolved player is the loser, everyone who
+ *   solved is a winner.
+ * - "first-out-wins": play stops the instant the FIRST player correctly
+ *   guesses their character — that player wins outright and the game
+ *   ends immediately, regardless of how many players are still unsolved.
+ *
+ * The lobby checkbox for "first-out-wins" is disabled with only 2 players
+ * in the room (see LobbyOptions) because the two modes become degenerate
+ * at 2 players — the first correct guess is simultaneously "the first one
+ * out" and "everyone but the last player," so there's no meaningful choice
+ * to offer. `start/route.ts` also re-derives/clamps this server-side
+ * rather than trusting the client-disabled checkbox.
+ */
+export type WhoAmIGameMode = "last-standing-loses" | "first-out-wins";
+
+export const DEFAULT_GAME_MODE: WhoAmIGameMode = "last-standing-loses";
+
 export interface WhoAmITurnState {
   /** Player ids, fixed for the whole session, established at game start. */
   turnOrder: string[];
@@ -42,6 +66,8 @@ export interface WhoAmITurnState {
    * questions — just skipped when picking the next asker.
    */
   solvedPlayerIds: string[];
+  /** Win-condition variant for this session — see `WhoAmIGameMode` above. */
+  gameMode: WhoAmIGameMode;
 }
 
 export class TurnStateError extends Error {}
@@ -50,9 +76,18 @@ export class TurnStateError extends Error {}
  * The state a freshly-started session begins in: first player in
  * turnOrder is up to ask, nobody's answering yet.
  */
-export function initialTurnState(turnOrder: readonly string[]): WhoAmITurnState {
+export function initialTurnState(
+  turnOrder: readonly string[],
+  gameMode: WhoAmIGameMode = DEFAULT_GAME_MODE
+): WhoAmITurnState {
   if (turnOrder.length === 0) {
     throw new TurnStateError("Cannot start a turn loop with no players.");
+  }
+  if (gameMode === "first-out-wins" && turnOrder.length <= 2) {
+    // Defensive, mirrors the disabled lobby checkbox (games/who-am-i/config.ts
+    // `LobbyOptions`) — the modes are degenerate at 2 players, so silently
+    // fall back rather than trust a client that bypassed the disabled UI.
+    gameMode = "last-standing-loses";
   }
   return {
     turnOrder: [...turnOrder],
@@ -62,6 +97,7 @@ export function initialTurnState(turnOrder: readonly string[]): WhoAmITurnState 
     answeringOrder: [],
     answeringIndex: 0,
     solvedPlayerIds: [],
+    gameMode,
   };
 }
 
@@ -84,7 +120,8 @@ export function isWhoAmITurnState(value: unknown): value is WhoAmITurnState {
     v.answeringOrder.every((id) => typeof id === "string") &&
     typeof v.answeringIndex === "number" &&
     Array.isArray(v.solvedPlayerIds) &&
-    v.solvedPlayerIds.every((id) => typeof id === "string")
+    v.solvedPlayerIds.every((id) => typeof id === "string") &&
+    (v.gameMode === "last-standing-loses" || v.gameMode === "first-out-wins")
   );
 }
 
@@ -97,9 +134,73 @@ export function currentResponderId(state: WhoAmITurnState): string | null {
   return state.answeringOrder[state.answeringIndex] ?? null;
 }
 
-/** SPEC.md §8 point 7: "Game ends when all players have guessed correctly." */
+/**
+ * Every player has correctly guessed — always a game-over condition
+ * regardless of `gameMode` (in "last-standing-loses" this is the edge case
+ * where the would-be loser guesses correctly on their very last possible
+ * turn instead of running out of unsolved company; in "first-out-wins" it
+ * can only happen if `isGameOver` somehow didn't already stop play after
+ * the first solve, which shouldn't occur, but this keeps the check
+ * unconditionally true as a fallback).
+ */
 export function isGameFullySolved(state: WhoAmITurnState): boolean {
   return state.turnOrder.length > 0 && state.solvedPlayerIds.length >= state.turnOrder.length;
+}
+
+/**
+ * Mode-aware game-end check — this is what callers (guess/route.ts) should
+ * use instead of `isGameFullySolved` directly, since "when is the game
+ * over" now depends on `state.gameMode`:
+ *   - "first-out-wins": over the instant one player has solved.
+ *   - "last-standing-loses": over once every player but (at most) one has
+ *     solved — the one left is the loser. Also covers the edge case where
+ *     literally everyone ends up solved.
+ */
+export function isGameOver(state: WhoAmITurnState): boolean {
+  if (state.turnOrder.length === 0) return false;
+  if (state.gameMode === "first-out-wins") {
+    return state.solvedPlayerIds.length >= 1;
+  }
+  return state.solvedPlayerIds.length >= state.turnOrder.length - 1;
+}
+
+export interface WhoAmIGameOutcome {
+  gameOver: boolean;
+  /** Player ids considered winners once `gameOver` is true, else []. */
+  winnerPlayerIds: string[];
+  /** Player ids considered losers once `gameOver` is true, else []. */
+  loserPlayerIds: string[];
+}
+
+/**
+ * Resolves who won/lost once `isGameOver(state)` is true. Safe to call
+ * before that too — just returns `gameOver: false` with empty lists.
+ *
+ *   - "first-out-wins": the single first solver is the winner; everyone
+ *     else (solved or not) is a loser — being first is the whole point,
+ *     so a second player solving afterward wouldn't matter, and can't
+ *     happen anyway since play stops at `isGameOver`.
+ *   - "last-standing-loses": everyone who solved is a winner; whichever
+ *     player(s) never solved (normally exactly one — see `isGameOver`)
+ *     are the loser(s).
+ */
+export function getGameOutcome(state: WhoAmITurnState): WhoAmIGameOutcome {
+  if (!isGameOver(state)) {
+    return { gameOver: false, winnerPlayerIds: [], loserPlayerIds: [] };
+  }
+  if (state.gameMode === "first-out-wins") {
+    const winner = state.solvedPlayerIds[0];
+    return {
+      gameOver: true,
+      winnerPlayerIds: winner ? [winner] : [],
+      loserPlayerIds: state.turnOrder.filter((id) => id !== winner),
+    };
+  }
+  return {
+    gameOver: true,
+    winnerPlayerIds: [...state.solvedPlayerIds],
+    loserPlayerIds: state.turnOrder.filter((id) => !state.solvedPlayerIds.includes(id)),
+  };
 }
 
 /**

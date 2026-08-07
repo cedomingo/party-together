@@ -36,8 +36,39 @@ export interface GameConfig {
    * that lets it do that without RoomClient (platform core) ever knowing
    * "Who Am I?" exists. Should throw on failure; RoomClient surfaces the
    * error and leaves the room in `lobby`.
+   *
+   * `options` is whatever the host last set via `LobbyOptions` below (or
+   * `defaultLobbyOptions` if they never touched it / this game has no
+   * `LobbyOptions`) — e.g. "Who Am I?"'s win-condition checkbox.
    */
-  onStart?: (supabase: SupabaseClient, room: Room) => Promise<void>;
+  onStart?: (supabase: SupabaseClient, room: Room, options: unknown) => Promise<void>;
+  /**
+   * Optional host-only lobby controls rendered above the "Start Game"
+   * button — the generic extension point that lets a game offer setup
+   * choices (e.g. "Who Am I?"'s "First One Out Wins?" checkbox) without
+   * RoomClient (platform core) ever hardcoding that this or any other game
+   * exists. RoomClient owns the `value` state (seeded from
+   * `defaultLobbyOptions`), re-renders this on every player-count change
+   * (so a game can disable options that don't make sense at the current
+   * player count), and passes the latest `value` straight through to
+   * `onStart` when the host presses "Start Game". Purely presentational —
+   * this component should not fetch or mutate anything itself.
+   */
+  LobbyOptions?: ComponentType<GameLobbyOptionsProps>;
+  /** Seed value for `LobbyOptions`'s `value`/`onStart`'s `options` before the host changes anything. */
+  defaultLobbyOptions?: unknown;
+}
+
+/**
+ * Props for a game's optional `LobbyOptions` component. Deliberately
+ * generic/untyped on `value` — RoomClient (platform core) just threads it
+ * through opaquely between `defaultLobbyOptions`, this component, and
+ * `onStart`; only the game module itself needs to know its shape.
+ */
+export interface GameLobbyOptionsProps {
+  players: Player[];
+  value: unknown;
+  onChange: (value: unknown) => void;
 }
 
 /**
@@ -48,11 +79,11 @@ export interface GameConfig {
  * RoomClient) must resolve the full GameConfig itself, client-side, via
  * `getGameConfig()` — the same pattern already used for `getGameRoomView`.
  */
-export type GameSummary = Omit<GameConfig, "onStart">;
+export type GameSummary = Omit<GameConfig, "onStart" | "LobbyOptions">;
 
 export function toGameSummary(config: GameConfig): GameSummary {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit it
-  const { onStart, ...summary } = config;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit them
+  const { onStart, LobbyOptions, ...summary } = config;
   return summary;
 }
 
