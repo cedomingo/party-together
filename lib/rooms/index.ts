@@ -202,17 +202,7 @@ export async function createRoom({
   nickname,
   maxPlayers = null,
 }: CreateRoomParams): Promise<CreateRoomResult> {
-  await ensureAnonSession(supabase);
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  console.log("[DEBUG createRoom]", {
-    userId: user?.id,
-    error: userError?.message,
-  });
+  const userId = await ensureAnonSession(supabase);
   const cleanNickname = sanitizeNickname(nickname);
 
   let room: Room | null = null;
@@ -253,6 +243,7 @@ export async function createRoom({
     .from("players")
     .insert({
       room_id: room.id,
+      auth_id: userId,
       nickname: cleanNickname,
       is_host: true,
     })
@@ -365,18 +356,9 @@ export async function joinRoomByCode(
 
   const { data: playerRow, error: insertError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, nickname: cleanNickname, is_host: false })
+    .insert({ room_id: room.id, auth_id: userId, nickname: cleanNickname, is_host: false })
     .select()
     .single();
-
-  console.log("[DEBUG joinRoomByCode] player insert failed", {
-    code: insertError?.code,
-    message: insertError?.message,
-    details: insertError?.details,
-    hint: insertError?.hint,
-    roomId: room.id,
-    userId,
-  });
 
   if (insertError || !playerRow) {
     // The RLS guard above can also reject this insert directly (a race
