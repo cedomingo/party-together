@@ -1,0 +1,32 @@
+-- ---------------------------------------------------------------------------
+-- Fix: game_sessions / questions_log were never added to the Realtime
+-- publication, so the Who Am I? turn loop never actually receives Postgres
+-- changes events.
+-- ---------------------------------------------------------------------------
+-- supabase/migrations/20260806120600_realtime_publication.sql added `rooms`
+-- and `players` to `supabase_realtime` for the lobby, but the Who Am I?
+-- turn loop shipped later (Phase 6a/6b) and needs its own two tables added
+-- the same way — see games/who-am-i/components/RoomView.tsx, which sets up
+-- `postgres_changes` subscriptions on both:
+--
+--   - `game_sessions` UPDATE (turn state / ended_at)
+--   - `questions_log` INSERT + UPDATE (the public question/answer log)
+--
+-- Without this, those subscriptions are wired up correctly client-side and
+-- silently never fire — Realtime only ships change events for tables that
+-- are actually in the publication, regardless of how a client subscribes.
+-- Every player was therefore relying entirely on:
+--   1. `broadcastTurnSync`'s ephemeral Broadcast channel (best-effort, only
+--      reaches clients whose channel happens to already be subscribed, and
+--      carries turn state only — never the question text itself), and
+--   2. the visibilitychange/online/pageshow resync effect, which only runs
+--      on a tab returning to the foreground (or an actual reload) — which
+--      matches "have to refresh to see changes" exactly.
+--
+-- RLS already allows room members to SELECT both tables
+-- (game_sessions_select_room_members, questions_log_select_room_members in
+-- 20260806120400_rls_core.sql), so adding them to the publication is
+-- sufficient on its own — no policy changes needed.
+
+alter publication supabase_realtime add table public.game_sessions;
+alter publication supabase_realtime add table public.questions_log;
