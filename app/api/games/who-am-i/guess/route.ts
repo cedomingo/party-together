@@ -67,9 +67,14 @@ export async function POST(request: Request) {
     if (currentAskerId(state) !== callerPlayerId) {
       return NextResponse.json({ error: "It isn't your turn to guess." }, { status: 403 });
     }
-    if (state.phase !== "asking" && state.phase !== "reviewing") {
+    if (state.phase !== "asking") {
       return NextResponse.json(
-        { error: "You can't guess while answers are still being collected." },
+        {
+          error:
+            state.phase === "reviewing"
+              ? "You've already asked your question this turn — press \"I'm Done\" instead, or guess next turn."
+              : "You can't guess while answers are still being collected.",
+        },
         { status: 409 }
       );
     }

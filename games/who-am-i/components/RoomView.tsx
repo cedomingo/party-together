@@ -708,7 +708,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
       ? (questions.find((q) => q.id === turnState.activeQuestionId) ?? null)
       : null;
   const hasSolved = turnState?.solvedPlayerIds.includes(currentPlayer.id) ?? false;
-  const canGuess = !endedAt && !hasSolved && (isMyTurnToAsk || isReviewingMyTurn);
+  const canGuess = !endedAt && !hasSolved && isMyTurnToAsk;
 
   // ---- presence-derived hint (SPEC.md §9 Presence) -----------------------
   // Whoever the turn indicator is currently waiting on — the asker while
@@ -894,10 +894,14 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
               </ul>
             )}
 
-            {/* Guess-your-identity (SPEC.md §8 point 6) — available on your
-                turn, whether you're about to ask ("asking") or reviewing
-                answers ("reviewing"), any time you haven't already solved
-                it. Host end-game control sits alongside it since both are
+            {/* Guess-your-identity (SPEC.md §8 point 6) — available ONLY
+                before you've asked your question this turn ("asking"
+                phase), any time you haven't already solved it. It's
+                instead-of asking, not in addition to it: once you've
+                submitted a question and moved into "reviewing", the guess
+                option is gone for the rest of this turn — see
+                `canGuess` and turnState.ts's `submitGuess` doc comment.
+                Host end-game control sits alongside it since both are
                 "leave the normal turn flow" actions. */}
             <div className="who-am-i-guess-panel">
               {hasSolved && (

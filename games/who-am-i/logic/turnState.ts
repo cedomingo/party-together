@@ -309,15 +309,15 @@ export function advanceTurn(state: WhoAmITurnState): WhoAmITurnState {
 
 /**
  * Transition: the current asker attempts to guess their own identity
- * (SPEC.md §8 point 6). Allowed "at any point on their turn instead of/
- * after asking a question" — read here as: before they've submitted a
- * question this turn ("asking" phase) or after a question round has
- * fully resolved and they're reviewing the board ("reviewing" phase).
- * Guessing mid-"answering" (while other players are still mid-response to
- * the question this same player just asked) is deliberately not allowed —
- * that would leave a question half-resolved with no clean way to unwind
- * it, which the spec doesn't describe. This mirrors the "no penalty for
- * a wrong guess" default the spec calls out as an open design decision.
+ * (SPEC.md §8 point 6). Allowed ONLY before they've submitted a question
+ * this turn — i.e. during "asking", before `startAnswering` has fired.
+ * Guessing is instead-of asking, not in addition to it: once a question
+ * round has started (`phase` moved to "answering"/"reviewing"), the guess
+ * option is gone for the rest of that turn and the asker's only move left
+ * is "I'm Done". This was previously also allowed during "reviewing" (a
+ * guess after your own question resolved), but that let a player question
+ * *then* guess in the same turn, which isn't how the game is meant to
+ * play — a turn is "ask, or guess," never "ask, then guess."
  *
  * `correct` is the caller's job to determine (by writing the player's
  * guess to `who_am_i_assignments.guessed_character_id` and reading back
@@ -335,7 +335,7 @@ export function submitGuess(
   guesserId: string,
   correct: boolean
 ): WhoAmITurnState {
-  if (state.phase !== "asking" && state.phase !== "reviewing") {
+  if (state.phase !== "asking") {
     throw new TurnStateError(`Cannot guess during phase "${state.phase}".`);
   }
   if (currentAskerId(state) !== guesserId) {
