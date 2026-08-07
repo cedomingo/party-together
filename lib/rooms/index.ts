@@ -258,6 +258,19 @@ export async function createRoom({
   const { data: authDebug, error: authDebugError } = await supabase.rpc("debug_auth");
   console.log("[DEBUG createRoom] auth.uid() as seen by Postgres:", authDebug, authDebugError);
 
+  // TEMPORARY DIAGNOSTIC — remove once the players-insert RLS policy is
+  // confirmed working. `full_with_check` is the answer: if it comes back
+  // `true` but the insert below still fails, the bug isn't in this
+  // policy's logic at all (something stranger — worth capturing the raw
+  // Postgres error `code`, not just the message, at that point). If it
+  // comes back `false`, whichever of `auth_id_matches` / `status_is_lobby`
+  // / `under_cap` is false tells us exactly where.
+  const { data: checkDebug, error: checkDebugError } = await supabase.rpc("debug_insert_check", {
+    target_room_id: room.id,
+    candidate_auth_id: user.id,
+  });
+  console.log("[DEBUG createRoom] insert-check breakdown:", checkDebug, checkDebugError);
+
   const { data: playerRow, error: playerError } = await supabase
     .from("players")
     .insert({
