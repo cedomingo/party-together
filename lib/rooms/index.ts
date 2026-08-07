@@ -202,7 +202,22 @@ export async function createRoom({
   nickname,
   maxPlayers = null,
 }: CreateRoomParams): Promise<CreateRoomResult> {
-  const userId = await ensureAnonSession(supabase);
+  await ensureAnonSession(supabase);
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new AuthSessionError(userError?.message ?? "No authenticated user.");
+  }
+
+  console.log("[DEBUG createRoom]", {
+    userId: user?.id,
+    error: userError?.message,
+  });
+
   const cleanNickname = sanitizeNickname(nickname);
 
   let room: Room | null = null;
@@ -243,7 +258,7 @@ export async function createRoom({
     .from("players")
     .insert({
       room_id: room.id,
-      auth_id: userId,
+      auth_id: user.id,
       nickname: cleanNickname,
       is_host: true,
     })
@@ -293,7 +308,16 @@ export async function joinRoomByCode(
   code: string,
   nickname: string
 ): Promise<JoinRoomResult> {
-  const userId = await ensureAnonSession(supabase);
+  await ensureAnonSession(supabase);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new AuthSessionError("No authenticated user.");
+  }
+
   const cleanNickname = sanitizeNickname(nickname);
 
   const room = await getRoomByCode(supabase, code);
@@ -305,7 +329,7 @@ export async function joinRoomByCode(
     .from("players")
     .select("*")
     .eq("room_id", room.id)
-    .eq("auth_id", userId)
+    .eq("auth_id", user.id)
     .maybeSingle();
 
   if (existingError) throw new RoomError(existingError.message);
@@ -356,9 +380,18 @@ export async function joinRoomByCode(
 
   const { data: playerRow, error: insertError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, auth_id: userId, nickname: cleanNickname, is_host: false })
+    .insert({ room_id: room.id, auth_id: user.id, nickname: cleanNickname, is_host: false })
     .select()
     .single();
+
+  console.log("[DEBUG joinRoomByCode] player insert failed", {
+    code: insertError?.code,
+    message: insertError?.message,
+    details: insertError?.details,
+    hint: insertError?.hint,
+    roomId: room.id,
+    userId: user.id,
+  });
 
   if (insertError || !playerRow) {
     // The RLS guard above can also reject this insert directly (a race
