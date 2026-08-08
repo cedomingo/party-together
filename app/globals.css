@@ -1,14 +1,68 @@
+/* ===========================================================================
+   Party Together — visual theme
+   ---------------------------------------------------------------------------
+   Cozy, hand-drawn indie-game look: warm parchment background, muted earthy
+   accent colors, thick ink outlines, chunky tactile buttons. Every selector
+   below is unchanged from the previous stylesheet (same class names, same
+   components, same behavior) — only the visual declarations were restyled.
+   =========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap");
+
 :root {
-  color-scheme: light dark;
-  --accent: #6c5ce7;
-  --border: color-mix(in srgb, currentColor 15%, transparent);
-  /* #c0392b, not the earlier #d64545 — the old value measured ~4.38:1
-     against white, just under WCAG AA's 4.5:1 for normal-size text
-     (.field-error runs at 0.85rem). This measures ~5.4:1 (SPEC.md §11
-     accessibility). */
-  --danger: #c0392b;
-  --online: #2ecc71;
-  --offline: #999;
+  color-scheme: light;
+
+  /* ---- Typography ------------------------------------------------------ */
+  --font-display: "Baloo 2", ui-rounded, "Segoe UI Rounded", sans-serif;
+  --font-body: "Quicksand", ui-rounded, system-ui, sans-serif;
+
+  /* ---- Palette (warm cream base + muted earthy accents) ----------------- */
+  --cream: #f5eedc; /* page background — aged/parchment paper */
+  --paper: #fbf6e8; /* card & panel surface, a shade lighter than the page */
+  --ink: #2f2a22; /* body text + hand-inked outlines */
+  --ink-70: rgba(47, 42, 34, 0.72);
+  --ink-45: rgba(47, 42, 34, 0.45);
+  --ink-18: rgba(47, 42, 34, 0.18);
+
+  --olive: #7d8645;
+  --lavender: #80709d;
+  --mustard: #d9a52f;
+  --coral: #c96f69;
+  --blue: #7894a8;
+
+  --accent: var(--mustard); /* primary buttons, interactive highlights */
+  --secondary: var(--olive); /* secondary bands/accents */
+  --special: var(--lavender); /* host badge, special callouts */
+  --info: var(--blue); /* links */
+
+  /* --danger is used both as a background (host "End Game" button, the
+     recap "lost" badge) and as plain text on --cream (.field-error, the
+     incorrect-guess result) — the same dual role the old #c0392b played.
+     The art-direction swatch (#c96f69, kept below as --coral for purely
+     decorative borders/tints) only measures ~3:1 against --cream — short
+     of WCAG AA's 4.5:1 for text — so --danger itself is a deeper dusty-brick
+     shade of the same coral family: ~4.55:1 against --cream, and ~4.55:1
+     again for --cream text sitting on a --danger background. Passes AA
+     both ways this file actually uses it. */
+  --danger: #9b5a54;
+
+  /* Same reasoning, for the "positive" case (a correct guess): plain
+     --olive is only ~3.4:1 against --cream. This deepened moss shade
+     clears 5.3:1 and still reads clearly as "olive/green". */
+  --online: #5f6532;
+  --offline: #b7ac96;
+
+  --border: var(--ink);
+
+  /* Gently irregular corners everywhere instead of perfect circles —
+     "hand-inked", not mathematically precise (per the art direction). */
+  --radius-lg: 22px 26px 20px 24px;
+  --radius-md: 16px 19px 14px 18px;
+  --radius-sm: 10px 12px 9px 11px;
+  --radius-pill: 999px;
+
+  --shadow-flat: 3px 4px 0 rgba(47, 42, 34, 0.16);
+  --shadow-flat-sm: 2px 3px 0 rgba(47, 42, 34, 0.18);
 }
 
 * {
@@ -24,8 +78,46 @@ html {
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  line-height: 1.5;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background-color: var(--cream);
+  /* Extremely subtle paper grain — a faint ink-tinted noise tile, not a
+     heavy filter (art direction: "should only make the interface feel
+     less digitally sterile"). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.18 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: clamp(1.7rem, 5vw, 2.35rem);
+  margin: 0 0 0.35rem;
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.5rem;
+}
+
+a {
+  color: var(--info);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--ink);
 }
 
 /* ---------------------------------------------------------------------
@@ -38,6 +130,9 @@ body {
    equivalent rule (Phase 5) — left as-is below since it also has to sit
    on top of that button's `overflow`/background, but it's the same
    outline color/offset as everything else here.
+   Ink (not the mustard accent) is used for the outline itself — mustard
+   only measures ~1.9:1 against the cream page background, easy to miss;
+   ink clears 12:1 against everything on this page.
    ------------------------------------------------------------------- */
 a:focus-visible,
 button:focus-visible,
@@ -45,7 +140,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -58,17 +153,20 @@ textarea:focus-visible,
   top: -3rem;
   left: 0.5rem;
   z-index: 100;
-  background: var(--accent);
-  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  background: var(--ink);
+  color: var(--cream);
   padding: 0.6rem 1rem;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 12px 12px;
   text-decoration: none;
   transition: top 0.15s ease;
 }
 
 .skip-link:focus-visible {
   top: 0;
-  outline-offset: -2px;
+  outline-color: var(--accent);
+  outline-offset: -3px;
 }
 
 /* Respect reduced-motion preferences (SPEC.md §11 accessibility) — every
@@ -117,17 +215,52 @@ a {
 }
 
 .page {
+  position: relative;
   max-width: 720px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
 }
 
+/* A couple of small hand-drawn doodles anchored to the page corners —
+   decorative accents only, never covering content (art direction:
+   "used as accents, not as clutter"). */
+.page::before,
+.page::after {
+  content: "";
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.page::before {
+  top: 0.5rem;
+  right: 0.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M20 3 L23 16 L36 20 L23 24 L20 37 L17 24 L4 20 L17 16 Z' fill='none' stroke='%237D8645' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.page::after {
+  bottom: 1.5rem;
+  left: 0.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M6 34 C6 20 16 8 30 6 C28 20 22 30 6 34 Z' fill='none' stroke='%2380709D' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M8 32 C14 26 20 18 28 9' fill='none' stroke='%2380709D' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 480px) {
+  .page::before,
+  .page::after {
+    display: none;
+  }
+}
+
 .lede {
-  opacity: 0.8;
+  color: var(--ink-70);
 }
 
 .muted {
-  opacity: 0.65;
+  color: var(--ink-45);
   font-size: 0.9em;
 }
 
@@ -144,18 +277,31 @@ a {
   }
 }
 
+/* Illustrated-paper card: cream surface, thick hand-inked outline, and a
+   colored "banner strip" along the top edge (art direction: "occasional
+   colored header/banner strips"). Defaults to mustard; the join form
+   sitting next to it on the homepage gets its own olive strip below so
+   the two don't read as identical twins. */
 .panel-form {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem;
+  background: var(--paper);
+  border: 2.5px solid var(--border);
+  border-top-width: 8px;
+  border-top-color: var(--accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-flat);
+  padding: 1.5rem 1.4rem;
+}
+
+.two-up .panel-form:last-child {
+  border-top-color: var(--secondary);
 }
 
 .panel-form h2 {
   margin: 0 0 0.25rem;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
 }
 
 .field {
@@ -163,36 +309,56 @@ a {
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .field input,
 .field select {
-  font: inherit;
-  padding: 0.55rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: inherit;
+  font: 500 1rem/1.3 var(--font-body);
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.field input::placeholder {
+  color: var(--ink-45);
 }
 
 button {
-  font: inherit;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  font: 700 1.05rem/1.2 var(--font-display);
+  padding: 0.65rem 1.3rem;
+  border-radius: var(--radius-md);
+  border: 2.5px solid var(--border);
   background: var(--accent);
-  color: white;
+  color: var(--ink);
   cursor: pointer;
   width: fit-content;
+  box-shadow: var(--shadow-flat-sm);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 82%, white);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 5px 0 rgba(47, 42, 34, 0.2);
+}
+
+button:active:not(:disabled) {
+  transform: translate(1px, 2px);
+  box-shadow: 1px 1px 0 rgba(47, 42, 34, 0.2);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .field-error {
   color: var(--danger);
+  font-weight: 600;
   font-size: 0.85rem;
   margin: 0;
 }
@@ -206,12 +372,13 @@ button:disabled {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  font-weight: 600;
   margin-bottom: 0.75rem;
 }
 
 .field-checkbox input[type="checkbox"] {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.2rem;
+  height: 1.2rem;
   accent-color: var(--accent);
 }
 
@@ -230,6 +397,12 @@ button:disabled {
 
 .room-code {
   margin: 0.15rem 0 0;
+  color: var(--ink-70);
+}
+
+.room-code strong {
+  color: var(--ink);
+  font-family: var(--font-display);
 }
 
 .player-list {
@@ -238,22 +411,25 @@ button:disabled {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }
 
 .player-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  box-sizing: border-box;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
+  border: 1.5px solid var(--ink);
   background: var(--offline);
   flex-shrink: 0;
 }
@@ -263,13 +439,19 @@ button:disabled {
 }
 
 .badge {
+  font-family: var(--font-display);
   font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--accent);
-  color: white;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
+  letter-spacing: 0.05em;
+  /* Solid (not pastel) lavender — the swatch's #80709D only clears ~3.8:1
+     against white/cream, short of AA for text this small; this deepened
+     shade clears 4.5:1 for the cream label sitting on top of it. */
+  background: #74668b;
+  color: var(--cream);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--ink);
 }
 
 /* ---------------------------------------------------------------------
@@ -284,19 +466,22 @@ button:disabled {
   align-items: center;
   gap: 0.6rem;
   text-align: center;
-  padding: 3rem 1rem;
+  padding: 3rem 1.5rem;
   margin-top: 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--paper);
+  border: 2.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-flat);
 }
 
 .state-screen h1 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
 }
 
 .state-screen-body {
   max-width: 40ch;
+  color: var(--ink-70);
 }
 
 .state-screen-body p {
@@ -304,7 +489,7 @@ button:disabled {
 }
 
 .state-screen-error {
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  border-color: var(--danger);
 }
 
 .state-screen-actions {
@@ -313,12 +498,13 @@ button:disabled {
 }
 
 .state-spinner {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 3px solid var(--border);
+  border: 4px dashed var(--ink-18);
   border-top-color: var(--accent);
-  animation: state-spinner-spin 0.8s linear infinite;
+  border-top-style: solid;
+  animation: state-spinner-spin 0.9s linear infinite;
 }
 
 @keyframes state-spinner-spin {
@@ -336,13 +522,15 @@ button:disabled {
   align-items: center;
   gap: 0.35rem;
   padding: 2.5rem 1rem;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
+  background: var(--paper);
+  border: 2px dashed var(--ink-45);
+  border-radius: var(--radius-md);
   text-align: center;
 }
 
 .game-placeholder p:first-child {
-  font-weight: 600;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 /* "Who Am I?" — Setup & Board phase (SPEC.md §8 "Setup"). */
@@ -370,8 +558,9 @@ button:disabled {
   gap: 0.4rem;
   width: 100%;
   padding: 0.5rem;
-  border-radius: 10px;
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  border: 2px solid var(--border);
   color: inherit;
   text-align: center;
 }
@@ -380,9 +569,9 @@ button:disabled {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  background: var(--cream);
 }
 
 .who-am-i-card-image img {
@@ -392,12 +581,13 @@ button:disabled {
 
 .who-am-i-card-name {
   font-size: 0.8rem;
+  font-weight: 600;
   line-height: 1.2;
   word-break: break-word;
 }
 
 .who-am-i-card.crossed-off {
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .who-am-i-card.crossed-off .who-am-i-card-image {
@@ -410,15 +600,15 @@ button:disabled {
   inset: 0;
   background: linear-gradient(
     to bottom right,
-    transparent calc(50% - 1.5px),
-    var(--danger) calc(50% - 1.5px),
-    var(--danger) calc(50% + 1.5px),
-    transparent calc(50% + 1.5px)
+    transparent calc(50% - 2px),
+    var(--danger) calc(50% - 2px),
+    var(--danger) calc(50% + 2px),
+    transparent calc(50% + 2px)
   );
 }
 
 .who-am-i-card:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -452,17 +642,18 @@ button:disabled {
   gap: 0.3rem;
   text-align: center;
   padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .who-am-i-player-card-image {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  background: var(--cream);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -473,14 +664,15 @@ button:disabled {
 }
 
 .who-am-i-player-card-hidden {
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
-  opacity: 0.35;
+  color: var(--ink-45);
 }
 
 .who-am-i-player-card-name {
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   word-break: break-word;
 }
@@ -488,6 +680,7 @@ button:disabled {
 .who-am-i-player-card-character {
   font-size: 0.75rem;
   line-height: 1.2;
+  color: var(--ink-70);
   word-break: break-word;
 }
 
@@ -496,7 +689,7 @@ button:disabled {
 .who-am-i-turn {
   margin-top: 1.5rem;
   padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px dashed var(--ink-18);
 }
 
 .who-am-i-turn h2 {
@@ -504,24 +697,27 @@ button:disabled {
 }
 
 .who-am-i-turn-indicator {
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   margin: 0 0 0.75rem;
 }
 
 .who-am-i-offline-hint {
   margin: -0.4rem 0 0.75rem;
+  color: var(--ink-70);
 }
 
 .who-am-i-typing-indicator {
   margin: -0.4rem 0 0.75rem;
   font-style: italic;
+  color: var(--ink-70);
 }
 
 .who-am-i-typing-indicator::before {
   content: "";
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   margin-right: 0.4em;
   border-radius: 50%;
   background: var(--accent);
@@ -546,7 +742,7 @@ button:disabled {
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.82rem;
-  opacity: 0.75;
+  color: var(--ink-70);
 }
 
 .who-am-i-ask-form {
@@ -557,8 +753,9 @@ button:disabled {
 }
 
 .who-am-i-active-question {
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
   margin: 0 0 1rem;
   display: flex;
@@ -591,7 +788,7 @@ button:disabled {
 
 .who-am-i-log h3 {
   margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .who-am-i-log-list {
@@ -603,17 +800,21 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  scrollbar-color: var(--secondary) var(--cream);
+  scrollbar-width: thin;
 }
 
 .who-am-i-log-entry {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
 }
 
 .who-am-i-log-question {
   margin: 0 0 0.35rem;
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .who-am-i-log-answers {
@@ -624,11 +825,15 @@ button:disabled {
   flex-wrap: wrap;
   gap: 0 0.75rem;
   font-size: 0.85rem;
-  opacity: 0.8;
+  color: var(--ink-70);
 }
 
+/* Guess attempts get a lavender-dashed outline instead of the default
+   ink-dashed one, so they read as visually distinct from a plain
+   yes/no/other question at a glance in the shared log list. */
 .who-am-i-log-entry-guess {
   border-style: dashed;
+  border-color: var(--special);
 }
 
 /* "Who Am I?" — Yes/No/Other answer control (SPEC.md §8 point 3 — a
@@ -645,9 +850,10 @@ button:disabled {
 }
 
 .who-am-i-other-answer-actions button[type="button"] {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: inherit;
+  background: var(--cream);
+  border: 2.5px solid var(--border);
+  color: var(--ink);
+  box-shadow: none;
 }
 
 /* "Who Am I?" — guess-your-identity + host "End Game" controls
@@ -658,8 +864,9 @@ button:disabled {
   gap: 0.6rem;
   margin: 0 0 1rem;
   padding: 0.85rem 1rem;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
+  background: var(--paper);
+  border: 2px dashed var(--ink-45);
+  border-radius: var(--radius-md);
 }
 
 .who-am-i-guess-form {
@@ -670,7 +877,8 @@ button:disabled {
 
 .who-am-i-guess-result {
   margin: 0;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
 }
 
 .who-am-i-guess-result-correct {
@@ -684,7 +892,7 @@ button:disabled {
 .who-am-i-solved-note {
   margin: 0;
   font-size: 0.9rem;
-  opacity: 0.8;
+  color: var(--ink-70);
 }
 
 .who-am-i-host-controls {
@@ -692,12 +900,13 @@ button:disabled {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.4rem;
-  padding-top: 0.4rem;
-  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  border-top: 2px dashed var(--ink-18);
 }
 
 .who-am-i-host-controls button {
   background: var(--danger);
+  color: var(--cream);
 }
 
 /* "Who Am I?" — Recap screen (SPEC.md §8 point 7). */
@@ -722,17 +931,19 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .who-am-i-recap-rank {
   flex-shrink: 0;
   width: 2rem;
+  font-family: var(--font-display);
   font-weight: 700;
   text-align: center;
-  opacity: 0.7;
+  color: var(--ink-70);
 }
 
 .who-am-i-recap-image {
@@ -740,9 +951,10 @@ button:disabled {
   flex-shrink: 0;
   width: 56px;
   height: 56px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 2px solid var(--border);
+  background: var(--cream);
 }
 
 .who-am-i-recap-image img {
@@ -761,7 +973,7 @@ button:disabled {
 
 .who-am-i-recap-unsolved h3 {
   margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .who-am-i-recap-unsolved-list {
@@ -777,19 +989,19 @@ button:disabled {
 .who-am-i-recap-log {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
+  border-top: 2px dashed var(--ink-18);
 }
 
 /* Mode-aware winner/loser framing (turnState.ts `getGameOutcome`) — see
-   Recap.tsx. Reuses the existing accent/danger palette rather than
-   introducing new colors, so it stays consistent with the rest of the UI
-   (`.field-error` already uses --danger, buttons already use --accent). */
+   Recap.tsx. Reuses the accent/danger palette rather than introducing new
+   colors, same as the rest of the UI (`.field-error` already uses
+   --danger, buttons already use --accent). */
 .who-am-i-recap-outcome {
   margin: 0.75rem 0 0;
-  padding: 0.6rem 0.85rem;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+  border: 2px solid color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 .who-am-i-recap-winner-badge,
@@ -798,8 +1010,16 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* Gold for a win — the badge default (lavender) reads as a neutral/host
+   tag, so the winner gets its own callout instead of inheriting that. */
+.who-am-i-recap-winner-badge {
+  background: var(--accent);
+  color: var(--ink);
+}
+
 .who-am-i-recap-loser-badge {
   background: var(--danger);
+  color: var(--cream);
 }
 
 /* ---------------------------------------------------------------------
