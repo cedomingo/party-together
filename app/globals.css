@@ -363,6 +363,200 @@ button:disabled {
   margin: 0;
 }
 
+/* -----------------------------------------------------------------------
+   Avatar creator — sits above the Create/Join two-up on the home page and
+   every per-game landing page (app/components/RoomForms.tsx). Same paper
+   card language as .panel-form (hand-inked border, banner strip) so it
+   reads as part of the family rather than a bolted-on widget.
+   ----------------------------------------------------------------------- */
+.avatar-creator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--paper);
+  border: 2.5px solid var(--border);
+  border-top-width: 8px;
+  border-top-color: var(--special);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-flat);
+  padding: 1.5rem 1.4rem;
+  margin-top: 1.5rem;
+}
+
+.avatar-creator .field {
+  width: 100%;
+  max-width: 22rem;
+  align-items: stretch;
+}
+
+.avatar-creator-preview {
+  display: flex;
+  justify-content: center;
+  padding: 0.15rem;
+}
+
+/* The composited mushroom + accessory preview. A circular "stage" with a
+   soft inset shadow so the paper-cutout art reads as sitting in a little
+   dish rather than floating on a hard edge. */
+.avatar-icon {
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--cream);
+  border: 2.5px solid var(--border);
+  box-shadow: inset 0 2px 6px rgba(47, 42, 34, 0.15);
+}
+
+.avatar-icon-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* "Wiggly paint" jitter: small, irregular rotate/scale/translate steps
+   (not a smooth sine bounce) so it reads as a hand-nudged paper cutout,
+   never perfectly static. The mushroom and accessory layers use offset
+   keyframe sets and durations so they don't wiggle in lockstep — like two
+   separate pieces of paper, not one rigid sticker. */
+@keyframes wiggle-a {
+  0% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+  14% {
+    transform: rotate(-2deg) scale(1.015) translate(-1px, 0.5px);
+  }
+  29% {
+    transform: rotate(1.4deg) scale(0.99) translate(1px, -0.5px);
+  }
+  45% {
+    transform: rotate(-1deg) scale(1.02) translate(-0.5px, 1px);
+  }
+  60% {
+    transform: rotate(1.8deg) scale(1) translate(1px, 0.5px);
+  }
+  74% {
+    transform: rotate(-1.6deg) scale(0.985) translate(-1px, -0.5px);
+  }
+  88% {
+    transform: rotate(1deg) scale(1.01) translate(0.5px, 1px);
+  }
+  100% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+}
+
+@keyframes wiggle-b {
+  0% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+  18% {
+    transform: rotate(2deg) scale(0.99) translate(1px, -0.5px);
+  }
+  33% {
+    transform: rotate(-1.6deg) scale(1.02) translate(-0.5px, 1px);
+  }
+  50% {
+    transform: rotate(1.2deg) scale(1) translate(-1px, -0.5px);
+  }
+  67% {
+    transform: rotate(-2deg) scale(1.015) translate(1px, 0.5px);
+  }
+  83% {
+    transform: rotate(1.6deg) scale(0.985) translate(-0.5px, -1px);
+  }
+  100% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+}
+
+.avatar-wiggle-a {
+  animation: wiggle-a 2.9s ease-in-out infinite;
+  transform-origin: 50% 65%;
+}
+
+.avatar-wiggle-b {
+  animation: wiggle-b 2.35s ease-in-out infinite;
+  transform-origin: 50% 55%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-wiggle-a,
+  .avatar-wiggle-b {
+    animation: none;
+  }
+}
+
+/* Color / Accessory pickers — a labelled row of "‹ value ›" arrows,
+   matching the sketch: compact enough to stack two of them under the
+   preview without the card feeling tall. */
+.avatar-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.avatar-picker-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink-70);
+  flex-shrink: 0;
+  width: 5.2rem;
+}
+
+.avatar-picker-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex: 1;
+}
+
+.avatar-picker-arrow {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.3rem 0.65rem;
+  min-height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--cream);
+  box-shadow: none;
+}
+
+.avatar-picker-arrow:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+.avatar-picker-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  min-width: 6.5rem;
+  text-align: center;
+}
+
+.avatar-swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+
 /* Host lobby options, e.g. "Who Am I?"'s "First One Out Wins?" toggle
    (see GameConfig.LobbyOptions in lib/games-registry.ts) — a single-row
    checkbox rather than the stacked label/input `.field` layout above. */

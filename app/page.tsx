@@ -4,8 +4,7 @@
 // this file (SPEC.md §3, §7).
 
 import { games, toGameSummary } from "@/lib/games-registry";
-import { CreateRoomForm } from "@/app/components/CreateRoomForm";
-import { JoinRoomForm } from "@/app/components/JoinRoomForm";
+import { RoomForms } from "@/app/components/RoomForms";
 
 export default function HomePage() {
   return (
@@ -13,10 +12,7 @@ export default function HomePage() {
       <h1>Party Together</h1>
       <p className="lede">Create a room, share the link, and play browser-based party games with friends.</p>
 
-      <div className="two-up">
-        <CreateRoomForm games={games.map(toGameSummary)} />
-        <JoinRoomForm />
-      </div>
+      <RoomForms games={games.map(toGameSummary)} />
 
       {games.length === 0 && <p className="muted">No games are registered yet — nothing to play just yet.</p>}
     </main>

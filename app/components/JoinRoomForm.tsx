@@ -1,21 +1,29 @@
 "use client";
 
 // Platform-core "Join Room" form (SPEC.md §7): code + nickname, no account.
+//
+// `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
+// via RoomForms.tsx) — there used to be a second "Your nickname" input
+// here, but the avatar creator above already asks for a name once, and
+// everything on this page shares it.
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { RoomError } from "@/lib/rooms";
 import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 
-export function JoinRoomForm({ fixedCode }: { fixedCode?: string } = {}) {
+export function JoinRoomForm({ fixedCode, nickname }: { fixedCode?: string; nickname: string }) {
   const router = useRouter();
   const [code, setCode] = useState(fixedCode ?? "");
-  const [nickname, setNickname] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!nickname.trim()) {
+      setError("Add a name up above first.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -45,18 +53,6 @@ export function JoinRoomForm({ fixedCode }: { fixedCode?: string } = {}) {
         />
       </label>
 
-      <label className="field">
-        <span>Your nickname</span>
-        <input
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          maxLength={32}
-          required
-          placeholder="e.g. Jordan"
-          autoComplete="off"
-        />
-      </label>
-
       {error && (
         <p className="field-error" role="alert">
           {error}
@@ -64,7 +60,7 @@ export function JoinRoomForm({ fixedCode }: { fixedCode?: string } = {}) {
       )}
 
       <button type="submit" disabled={loading}>
-        {loading ? "Joining…" : "Join room"}
+        {loading ? "Joining…" : "Join a room"}
       </button>
     </form>
   );

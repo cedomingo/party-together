@@ -3,6 +3,11 @@
 // Platform-core "Create Room" form (SPEC.md §7). Game-agnostic: it just
 // reads whatever is in the games registry and lets the host pick one — it
 // has no idea "Who Am I?" specifically exists.
+//
+// `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
+// via RoomForms.tsx) rather than a field of its own — there used to be a
+// second "Your nickname" input here, but the avatar creator above already
+// asks for a name once, and everything on this page shares it.
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -10,9 +15,16 @@ import { RoomError } from "@/lib/rooms";
 import { createRoomViaApi } from "@/lib/rooms/client";
 import type { GameSummary } from "@/lib/games-registry";
 
-export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; fixedGameId?: string }) {
+export function CreateRoomForm({
+  games,
+  fixedGameId,
+  nickname,
+}: {
+  games: GameSummary[];
+  fixedGameId?: string;
+  nickname: string;
+}) {
   const router = useRouter();
-  const [nickname, setNickname] = useState("");
   const [gameId, setGameId] = useState(fixedGameId ?? games[0]?.id ?? "");
   const [maxPlayers, setMaxPlayers] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +34,10 @@ export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; f
     event.preventDefault();
     if (!gameId) {
       setError("No games are available to play yet.");
+      return;
+    }
+    if (!nickname.trim()) {
+      setError("Add a name up above first.");
       return;
     }
     setLoading(true);
@@ -43,18 +59,6 @@ export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; f
   return (
     <form className="panel-form" onSubmit={handleSubmit}>
       <h2>Create a room</h2>
-
-      <label className="field">
-        <span>Your nickname</span>
-        <input
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          maxLength={32}
-          required
-          placeholder="e.g. Sam"
-          autoComplete="off"
-        />
-      </label>
 
       {!fixedGameId && (
         <label className="field">
@@ -88,7 +92,7 @@ export function CreateRoomForm({ games, fixedGameId }: { games: GameSummary[]; f
       )}
 
       <button type="submit" disabled={loading || !gameId}>
-        {loading ? "Creating…" : "Create room"}
+        {loading ? "Creating…" : "Create a room"}
       </button>
     </form>
   );
