@@ -14,6 +14,7 @@
 // who can do what; this module just shapes the calls.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MUSHROOMS, ACCESSORIES } from "@/lib/avatar";
 
 // ------------------------------------------------------------------ types --
 
@@ -38,6 +39,8 @@ export interface Player {
   is_host: boolean;
   connected: boolean;
   joined_at: string;
+  mushroom_index: number;
+  accessory_index: number;
 }
 
 // ----------------------------------------------------------------- errors --
@@ -118,6 +121,20 @@ function expiryTimestamp(hours: number = ROOM_EXPIRY_HOURS): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
+/**
+ * Falls back to 0 for anything not a valid in-range index (including
+ * "in range for an older/shorter build of lib/avatar.ts") rather than
+ * throwing — an out-of-range avatar index isn't a reason to fail the
+ * whole create/join, unlike an empty nickname. `getMushroom`/`getAccessory`
+ * apply the same 0-fallback on read, so this just means an odd value never
+ * makes it into storage in the first place.
+ */
+function clampAvatarIndex(value: unknown, length: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  const truncated = Math.trunc(value);
+  return truncated >= 0 && truncated < length ? truncated : 0;
+}
+
 // -------------------------------------------------------------- identity --
 
 /**
@@ -179,6 +196,8 @@ export interface CreateRoomParams {
   gameId: string;
   nickname: string;
   maxPlayers?: number | null;
+  mushroomIndex?: number;
+  accessoryIndex?: number;
 }
 
 export interface CreateRoomResult {
@@ -201,6 +220,8 @@ export async function createRoom({
   gameId,
   nickname,
   maxPlayers = null,
+  mushroomIndex,
+  accessoryIndex,
 }: CreateRoomParams): Promise<CreateRoomResult> {
   await ensureAnonSession(supabase);
 
@@ -278,6 +299,8 @@ export async function createRoom({
       auth_id: user.id,
       nickname: cleanNickname,
       is_host: true,
+      mushroom_index: clampAvatarIndex(mushroomIndex, MUSHROOMS.length),
+      accessory_index: clampAvatarIndex(accessoryIndex, ACCESSORIES.length),
     })
     .select()
     .single();
@@ -331,7 +354,9 @@ export interface JoinRoomResult {
 export async function joinRoomByCode(
   supabase: SupabaseClient,
   code: string,
-  nickname: string
+  nickname: string,
+  mushroomIndex?: number,
+  accessoryIndex?: number
 ): Promise<JoinRoomResult> {
   await ensureAnonSession(supabase);
 
@@ -362,7 +387,11 @@ export async function joinRoomByCode(
   if (existing) {
     const { error: reconnectError } = await supabase
       .from("players")
-      .update({ connected: true })
+      .update({
+        connected: true,
+        mushroom_index: clampAvatarIndex(mushroomIndex, MUSHROOMS.length),
+        accessory_index: clampAvatarIndex(accessoryIndex, ACCESSORIES.length),
+      })
       .eq("id", existing.id);
     if (reconnectError) throw new RoomError(reconnectError.message);
 
@@ -405,7 +434,14 @@ export async function joinRoomByCode(
 
   const { data: playerRow, error: insertError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, auth_id: user.id, nickname: cleanNickname, is_host: false })
+    .insert({
+      room_id: room.id,
+      auth_id: user.id,
+      nickname: cleanNickname,
+      is_host: false,
+      mushroom_index: clampAvatarIndex(mushroomIndex, MUSHROOMS.length),
+      accessory_index: clampAvatarIndex(accessoryIndex, ACCESSORIES.length),
+    })
     .select()
     .single();
 

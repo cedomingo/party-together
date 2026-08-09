@@ -27,14 +27,14 @@ const LIMIT = 20;
 const WINDOW_SECONDS = 10 * 60;
 
 export async function POST(request: Request) {
-  let body: { code?: unknown; nickname?: unknown };
+  let body: { code?: unknown; nickname?: unknown; mushroomIndex?: unknown; accessoryIndex?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { code, nickname } = body;
+  const { code, nickname, mushroomIndex, accessoryIndex } = body;
   if (typeof code !== "string" || code.length === 0) {
     return NextResponse.json({ error: "code (string) is required." }, { status: 400 });
   }
@@ -50,7 +50,13 @@ export async function POST(request: Request) {
     });
 
     const supabase = await createSupabaseServerClient();
-    const result = await joinRoomByCode(supabase, code, nickname);
+    const result = await joinRoomByCode(
+      supabase,
+      code,
+      nickname,
+      typeof mushroomIndex === "number" ? mushroomIndex : undefined,
+      typeof accessoryIndex === "number" ? accessoryIndex : undefined
+    );
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof RateLimitError) {

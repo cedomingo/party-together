@@ -23,14 +23,14 @@ const LIMIT = 5;
 const WINDOW_SECONDS = 10 * 60;
 
 export async function POST(request: Request) {
-  let body: { gameId?: unknown; nickname?: unknown; maxPlayers?: unknown };
+  let body: { gameId?: unknown; nickname?: unknown; maxPlayers?: unknown; mushroomIndex?: unknown; accessoryIndex?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { gameId, nickname, maxPlayers } = body;
+  const { gameId, nickname, maxPlayers, mushroomIndex, accessoryIndex } = body;
   if (typeof gameId !== "string" || gameId.length === 0) {
     return NextResponse.json({ error: "gameId (string) is required." }, { status: 400 });
   }
@@ -50,7 +50,14 @@ export async function POST(request: Request) {
     });
 
     const supabase = await createSupabaseServerClient();
-    const result = await createRoom({ supabase, gameId, nickname, maxPlayers: parsedMaxPlayers });
+    const result = await createRoom({
+      supabase,
+      gameId,
+      nickname,
+      maxPlayers: parsedMaxPlayers,
+      mushroomIndex: typeof mushroomIndex === "number" ? mushroomIndex : undefined,
+      accessoryIndex: typeof accessoryIndex === "number" ? accessoryIndex : undefined,
+    });
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof RateLimitError) {

@@ -1,11 +1,20 @@
 "use client";
 
 // Platform-core avatar creator. Sits above the Create/Join forms on the
-// home page and every per-game landing page (SPEC.md §7 pattern) so a
-// visitor picks a name + look exactly once, instead of typing a nickname
-// separately into each form. Purely presentational/client-side for now —
-// nothing here is persisted server-side yet, `name` is just handed down to
+// home page, every per-game landing page, and the in-room "join by link"
+// form (SPEC.md §7 pattern) so a visitor picks a name + look exactly once,
+// instead of typing a nickname separately into each form. The chosen
+// name/color/accessory is persisted to localStorage by the caller (see
+// loadStoredAvatar/saveStoredAvatar in lib/avatar.ts) so it carries over
+// the next time this visitor creates or joins a room — the look itself is
+// still client-side only, `name` is just handed down to
 // CreateRoomForm/JoinRoomForm as the nickname.
+//
+// The color/accessory rows show only the category word ("Color" /
+// "Accessory"), not the specific option's name — the swatch/name already
+// isn't needed to tell what changed, since the preview above updates live.
+// The actual value is still exposed to screen readers via the buttons'
+// aria-labels and a visually-hidden suffix on each row.
 
 import { MUSHROOMS, ACCESSORIES, getMushroom, getAccessory } from "@/lib/avatar";
 import { AvatarIcon } from "@/app/components/AvatarIcon";
@@ -37,13 +46,13 @@ export function AvatarCreator({
   return (
     <div className="avatar-creator">
       <label className="field">
-        <span>Your name</span>
         <input
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           maxLength={32}
           placeholder="e.g. Sam"
           autoComplete="off"
+          aria-label="Your name"
         />
       </label>
 
@@ -52,52 +61,49 @@ export function AvatarCreator({
       </div>
 
       <div className="avatar-picker">
-        <span className="avatar-picker-label">Color</span>
-        <div className="avatar-picker-control">
-          <button
-            type="button"
-            className="avatar-picker-arrow"
-            aria-label="Previous color"
-            onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, -1))}
-          >
-            ‹
-          </button>
-          <span className="avatar-picker-value">
-            <span className="avatar-swatch" style={{ background: mushroom.swatch }} aria-hidden="true" />
-            {mushroom.label}
-          </span>
-          <button
-            type="button"
-            className="avatar-picker-arrow"
-            aria-label="Next color"
-            onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, 1))}
-          >
-            ›
-          </button>
-        </div>
+        <button
+          type="button"
+          className="avatar-picker-arrow"
+          aria-label={`Previous color (currently ${mushroom.label})`}
+          onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, -1))}
+        >
+          ‹
+        </button>
+        <span className="avatar-picker-value">
+          Color
+          <span className="sr-only"> ({mushroom.label})</span>
+        </span>
+        <button
+          type="button"
+          className="avatar-picker-arrow"
+          aria-label={`Next color (currently ${mushroom.label})`}
+          onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, 1))}
+        >
+          ›
+        </button>
       </div>
 
       <div className="avatar-picker">
-        <span className="avatar-picker-label">Accessory</span>
-        <div className="avatar-picker-control">
-          <button
-            type="button"
-            className="avatar-picker-arrow"
-            aria-label="Previous accessory"
-            onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, -1))}
-          >
-            ‹
-          </button>
-          <span className="avatar-picker-value">{accessory.label}</span>
-          <button
-            type="button"
-            className="avatar-picker-arrow"
-            aria-label="Next accessory"
-            onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, 1))}
-          >
-            ›
-          </button>
-        </div>
+        <button
+          type="button"
+          className="avatar-picker-arrow"
+          aria-label={`Previous accessory (currently ${accessory.label})`}
+          onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, -1))}
+        >
+          ‹
+        </button>
+        <span className="avatar-picker-value">
+          Accessory
+          <span className="sr-only"> ({accessory.label})</span>
+        </span>
+        <button
+          type="button"
+          className="avatar-picker-arrow"
+          aria-label={`Next accessory (currently ${accessory.label})`}
+          onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, 1))}
+        >
+          ›
+        </button>
       </div>
     </div>
   );

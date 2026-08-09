@@ -30,6 +30,9 @@ import {
 import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
 import { StatusScreen } from "@/app/components/StatusScreen";
+import { AvatarCreator } from "@/app/components/AvatarCreator";
+import { AvatarIcon } from "@/app/components/AvatarIcon";
+import { loadStoredAvatar, saveStoredAvatar, type AvatarSelection } from "@/lib/avatar";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
@@ -49,9 +52,18 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
-  const [joinNickname, setJoinNickname] = useState("");
+  // Lazy-initialized straight from localStorage (see lib/avatar.ts) rather
+  // than the two-phase load RoomForms.tsx needs: this branch never
+  // server-renders (the component starts in the "loading" state and only
+  // reaches the join form after client-side data fetching), so there's no
+  // SSR/first-paint markup to keep in sync with.
+  const [joinAvatar, setJoinAvatar] = useState<AvatarSelection>(() => loadStoredAvatar());
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    saveStoredAvatar(joinAvatar);
+  }, [joinAvatar]);
 
   const [starting, setStarting] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy invite link");
@@ -273,7 +285,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     setJoining(true);
     setJoinError(null);
     try {
-      const result = await joinRoomByCodeViaApi(code, joinNickname);
+      const result = await joinRoomByCodeViaApi(code, joinAvatar.name, joinAvatar.mushroomIndex, joinAvatar.accessoryIndex);
       const freshRoom = await getRoomByCode(supabase, code);
       if (freshRoom) setRoom(freshRoom);
       await refreshPlayers(result.roomId);
@@ -371,6 +383,12 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
           <ul className="player-list">
             {players.map((p) => (
               <li key={p.id} className="player-row">
+                <AvatarIcon
+                  mushroomIndex={p.mushroom_index}
+                  accessoryIndex={p.accessory_index}
+                  size={36}
+                  wiggle={false}
+                />
                 <span
                   className={`status-dot ${onlineIds.has(p.id) || p.connected ? "online" : "offline"}`}
                   aria-hidden="true"
@@ -488,24 +506,23 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     <main className="page" id="main-content">
       <h1>Join room {room.code}</h1>
       <p className="lede">{gameConfig?.displayName ?? room.game_id}</p>
+
+      <AvatarCreator
+        name={joinAvatar.name}
+        onNameChange={(name) => setJoinAvatar((a) => ({ ...a, name }))}
+        mushroomIndex={joinAvatar.mushroomIndex}
+        onMushroomIndexChange={(mushroomIndex) => setJoinAvatar((a) => ({ ...a, mushroomIndex }))}
+        accessoryIndex={joinAvatar.accessoryIndex}
+        onAccessoryIndexChange={(accessoryIndex) => setJoinAvatar((a) => ({ ...a, accessoryIndex }))}
+      />
+
       <form className="panel-form" onSubmit={handleJoinSubmit}>
-        <label className="field">
-          <span>Your nickname</span>
-          <input
-            value={joinNickname}
-            onChange={(e) => setJoinNickname(e.target.value)}
-            maxLength={32}
-            required
-            placeholder="e.g. Riley"
-            autoComplete="off"
-          />
-        </label>
         {joinError && (
           <p className="field-error" role="alert">
             {joinError}
           </p>
         )}
-        <button type="submit" disabled={joining}>
+        <button type="submit" disabled={joining || !joinAvatar.name.trim()}>
           {joining ? "Joining…" : "Join room"}
         </button>
       </form>

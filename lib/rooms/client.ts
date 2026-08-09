@@ -39,10 +39,17 @@ export async function createRoomViaApi(params: {
   gameId: string;
   nickname: string;
   maxPlayers?: number | null;
+  mushroomIndex?: number;
+  accessoryIndex?: number;
 }): Promise<CreateRoomResult> {
   return postJson<CreateRoomResult>("/api/rooms/create", params);
 }
 
-export async function joinRoomByCodeViaApi(code: string, nickname: string): Promise<JoinRoomResult> {
-  return postJson<JoinRoomResult>("/api/rooms/join", { code, nickname });
+export async function joinRoomByCodeViaApi(
+  code: string,
+  nickname: string,
+  mushroomIndex?: number,
+  accessoryIndex?: number
+): Promise<JoinRoomResult> {
+  return postJson<JoinRoomResult>("/api/rooms/join", { code, nickname, mushroomIndex, accessoryIndex });
 }

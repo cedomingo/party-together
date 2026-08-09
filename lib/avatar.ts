@@ -64,3 +64,54 @@ export const DEFAULT_AVATAR: AvatarSelection = {
   mushroomIndex: 0,
   accessoryIndex: 0,
 };
+
+// ---------------------------------------------------------------------
+// Local persistence — remembers name/color/accessory across visits (and
+// across the homepage, per-game landing pages, and joining via an invite
+// link) so a player never has to rebuild their look every time they
+// create or join a room. Shared by every screen that renders
+// <AvatarCreator> (app/components/RoomForms.tsx and the in-room "join by
+// link" form in app/games/[game]/room/[code]/RoomClient.tsx) so they all
+// read/write the same record instead of each keeping its own copy.
+//
+// localStorage rather than a cookie: this is a client-only display
+// preference — nothing server-side ever needs to read it (see the
+// `AvatarSelection` note above), so there's no reason to pay the
+// send-it-with-every-request cost a cookie carries.
+// ---------------------------------------------------------------------
+
+export const AVATAR_STORAGE_KEY = "party-together:avatar";
+
+export function loadStoredAvatar(): AvatarSelection {
+  if (typeof window === "undefined") return DEFAULT_AVATAR;
+  try {
+    const raw = window.localStorage.getItem(AVATAR_STORAGE_KEY);
+    if (!raw) return DEFAULT_AVATAR;
+    const parsed = JSON.parse(raw) as Partial<AvatarSelection>;
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : DEFAULT_AVATAR.name,
+      mushroomIndex:
+        typeof parsed.mushroomIndex === "number" && parsed.mushroomIndex >= 0 && parsed.mushroomIndex < MUSHROOMS.length
+          ? parsed.mushroomIndex
+          : DEFAULT_AVATAR.mushroomIndex,
+      accessoryIndex:
+        typeof parsed.accessoryIndex === "number" &&
+        parsed.accessoryIndex >= 0 &&
+        parsed.accessoryIndex < ACCESSORIES.length
+          ? parsed.accessoryIndex
+          : DEFAULT_AVATAR.accessoryIndex,
+    };
+  } catch {
+    return DEFAULT_AVATAR;
+  }
+}
+
+export function saveStoredAvatar(avatar: AvatarSelection): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(avatar));
+  } catch {
+    // Storage can be unavailable (private browsing, quota) — the picker
+    // still works for this visit, it just won't be remembered.
+  }
+}

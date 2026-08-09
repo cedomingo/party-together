@@ -12,7 +12,17 @@ import { useRouter } from "next/navigation";
 import { RoomError } from "@/lib/rooms";
 import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 
-export function JoinRoomForm({ fixedCode, nickname }: { fixedCode?: string; nickname: string }) {
+export function JoinRoomForm({
+  fixedCode,
+  nickname,
+  mushroomIndex,
+  accessoryIndex,
+}: {
+  fixedCode?: string;
+  nickname: string;
+  mushroomIndex: number;
+  accessoryIndex: number;
+}) {
   const router = useRouter();
   const [code, setCode] = useState(fixedCode ?? "");
   const [loading, setLoading] = useState(false);
@@ -27,7 +37,7 @@ export function JoinRoomForm({ fixedCode, nickname }: { fixedCode?: string; nick
     setLoading(true);
     setError(null);
     try {
-      const result = await joinRoomByCodeViaApi(code, nickname);
+      const result = await joinRoomByCodeViaApi(code, nickname, mushroomIndex, accessoryIndex);
       router.push(`/games/${result.gameId}/room/${result.code}`);
     } catch (err) {
       setError(err instanceof RoomError ? err.message : "Something went wrong joining the room.");

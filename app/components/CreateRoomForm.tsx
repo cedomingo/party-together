@@ -19,10 +19,14 @@ export function CreateRoomForm({
   games,
   fixedGameId,
   nickname,
+  mushroomIndex,
+  accessoryIndex,
 }: {
   games: GameSummary[];
   fixedGameId?: string;
   nickname: string;
+  mushroomIndex: number;
+  accessoryIndex: number;
 }) {
   const router = useRouter();
   const [gameId, setGameId] = useState(fixedGameId ?? games[0]?.id ?? "");
@@ -48,6 +52,8 @@ export function CreateRoomForm({
         gameId,
         nickname,
         maxPlayers: parsedMax && parsedMax > 0 ? parsedMax : null,
+        mushroomIndex,
+        accessoryIndex,
       });
       router.push(`/games/${gameId}/room/${code}`);
     } catch (err) {
