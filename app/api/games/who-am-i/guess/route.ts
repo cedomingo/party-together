@@ -67,13 +67,18 @@ export async function POST(request: Request) {
     if (currentAskerId(state) !== callerPlayerId) {
       return NextResponse.json({ error: "It isn't your turn to guess." }, { status: 403 });
     }
-    if (state.phase !== "asking") {
+    // With real 1:1 targeting, `phase` cycles back to "asking" between
+    // EACH responder's question within the same turn (see turnState.ts's
+    // `advanceAfterAnswer`) — so "haven't asked yet this turn" needs
+    // `turnQuestionIds` too, not just the phase, or a player could ask one
+    // responder, see the answer, and only then guess.
+    if (state.phase !== "asking" || state.turnQuestionIds.length > 0) {
       return NextResponse.json(
         {
           error:
-            state.phase === "reviewing"
-              ? "You've already asked your question this turn — press \"I'm Done\" instead, or guess next turn."
-              : "You can't guess while answers are still being collected.",
+            state.phase === "answering"
+              ? "You can't guess while an answer is still being collected."
+              : "You've already asked a question this turn — press \"I'm Done\" instead, or guess next turn.",
         },
         { status: 409 }
       );

@@ -32,6 +32,8 @@ export interface WhoAmIRecapEntry {
 export interface WhoAmIRecapQuestion {
   id: string;
   asking_player_id: string;
+  /** Who this question was 1:1 directed at. Undefined/null for guess rows. */
+  target_player_id?: string | null;
   question_text: string;
   answers: Record<string, string>;
   /** True when this entry records a guess rather than an asked question
@@ -186,7 +188,11 @@ export function WhoAmIRecap({
               return (
                 <li key={q.id} className="who-am-i-log-entry">
                   <p className="who-am-i-log-question">
-                    <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
+                    <strong>
+                      {nicknameFor(q.asking_player_id)}
+                      {q.target_player_id ? ` asked ${nicknameFor(q.target_player_id)}` : ""}:
+                    </strong>{" "}
+                    {q.question_text}
                   </p>
                   {Object.keys(q.answers).length > 0 && (
                     <ul className="who-am-i-log-answers">

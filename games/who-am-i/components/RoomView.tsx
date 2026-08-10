@@ -61,6 +61,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { GameRoomViewProps } from "@/lib/games-registry";
 import {
   currentAskerId,
+  currentAskTargetId,
   currentResponderId,
   getGameOutcome,
   isWhoAmITurnState,
@@ -107,6 +108,8 @@ interface QuestionLogRow {
   id: string;
   session_id: string;
   asking_player_id: string;
+  /** Who this question is 1:1 directed at. Null only for is_guess rows. */
+  target_player_id: string | null;
   question_text: string;
   created_at: string;
   answers: Record<string, AnswerValue>;
@@ -248,7 +251,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
         const { data: questionRows, error: questionsError } = await supabase
           .from("questions_log")
           .select(
-            "id, session_id, asking_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
+            "id, session_id, asking_player_id, target_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
           )
           .eq("session_id", sessionRow.id)
           .order("created_at", { ascending: true });
@@ -423,7 +426,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
         const { data: questionRows } = await supabase
           .from("questions_log")
           .select(
-            "id, session_id, asking_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
+            "id, session_id, asking_player_id, target_player_id, question_text, created_at, answers, resolved, is_guess, guessed_character_id"
           )
           .eq("session_id", sessionId)
           .order("created_at", { ascending: true });
@@ -700,6 +703,9 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   // ---- turn loop derived view state --------------------------------------
   const askerId = turnState ? currentAskerId(turnState) : null;
   const responderId = turnState ? currentResponderId(turnState) : null;
+  // Who the asker is (about to be) composing a question FOR — only
+  // meaningful during "asking" (see turnState.ts's `currentAskTargetId`).
+  const askTargetId = turnState ? currentAskTargetId(turnState) : null;
   const isMyTurnToAsk = turnState?.phase === "asking" && askerId === currentPlayer.id;
   const isMyTurnToAnswer = turnState?.phase === "answering" && responderId === currentPlayer.id;
   const isReviewingMyTurn = turnState?.phase === "reviewing" && askerId === currentPlayer.id;
@@ -707,8 +713,20 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     turnState?.activeQuestionId != null
       ? (questions.find((q) => q.id === turnState.activeQuestionId) ?? null)
       : null;
+  // Every question asked THIS turn (one per responder), for the review
+  // screen — see turnState.ts's `turnQuestionIds` doc comment for why a
+  // single `activeQuestion` no longer covers the whole turn.
+  const turnQuestions = useMemo(
+    () =>
+      turnState
+        ? turnState.turnQuestionIds
+            .map((id) => questions.find((q) => q.id === id))
+            .filter((q): q is QuestionLogRow => q != null)
+        : [],
+    [turnState, questions]
+  );
   const hasSolved = turnState?.solvedPlayerIds.includes(currentPlayer.id) ?? false;
-  const canGuess = !endedAt && !hasSolved && isMyTurnToAsk;
+  const canGuess = !endedAt && !hasSolved && isMyTurnToAsk && (turnState?.turnQuestionIds.length ?? 0) === 0;
 
   // ---- presence-derived hint (SPEC.md §9 Presence) -----------------------
   // Whoever the turn indicator is currently waiting on — the asker while
@@ -782,6 +800,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
       questions.map((q) => ({
         id: q.id,
         asking_player_id: q.asking_player_id,
+        target_player_id: q.target_player_id,
         question_text: q.question_text,
         answers: q.answers,
         is_guess: q.is_guess,
@@ -851,8 +870,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
             <p className="who-am-i-turn-indicator" role="status" aria-live="polite">
               {turnState.phase === "asking" &&
                 (isMyTurnToAsk
-                  ? "Your turn — ask a yes/no question."
-                  : `Waiting for ${nicknameFor(askerId ?? "")} to ask a question.`)}
+                  ? `Your turn — ask ${nicknameFor(askTargetId ?? "")} a yes/no question.`
+                  : askTargetId === currentPlayer.id
+                    ? `${nicknameFor(askerId ?? "")} is about to ask you a question.`
+                    : `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")} a question.`)}
               {turnState.phase === "answering" &&
                 (isMyTurnToAnswer
                   ? "Your turn to answer."
@@ -966,10 +987,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
               )}
             </div>
 
-            {isMyTurnToAsk && (
+            {isMyTurnToAsk && askTargetId && (
               <form className="who-am-i-ask-form" onSubmit={submitQuestion}>
                 <label className="field">
-                  <span>Ask a yes/no question</span>
+                  <span>Ask {nicknameFor(askTargetId)} a yes/no question</span>
                   <input
                     value={questionDraft}
                     onChange={(e) => handleQuestionDraftChange(e.target.value)}
@@ -985,7 +1006,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                   </p>
                 )}
                 <button type="submit" disabled={asking || questionDraft.trim().length === 0}>
-                  {asking ? "Asking…" : "Ask"}
+                  {asking ? "Asking…" : `Ask ${nicknameFor(askTargetId)}`}
                 </button>
               </form>
             )}
@@ -993,7 +1014,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
             {turnState.phase === "answering" && activeQuestion && (
               <div className="who-am-i-active-question">
                 <p>
-                  <strong>{nicknameFor(activeQuestion.asking_player_id)} asks:</strong>{" "}
+                  <strong>
+                    {nicknameFor(activeQuestion.asking_player_id)} asks
+                    {isMyTurnToAnswer ? " you" : ` ${nicknameFor(responderId ?? "")}`}:
+                  </strong>{" "}
                   {activeQuestion.question_text}
                 </p>
                 {isMyTurnToAnswer ? (
@@ -1056,9 +1080,7 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                     </form>
                   )
                 ) : (
-                  <p className="muted">
-                    {nicknameFor(responderId ?? "")} is answering next.
-                  </p>
+                  <p className="muted">Waiting for {nicknameFor(responderId ?? "")} to answer.</p>
                 )}
                 {answerError && (
                   <p className="field-error" role="alert">
@@ -1068,16 +1090,25 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
               </div>
             )}
 
-            {turnState.phase === "reviewing" && activeQuestion && (
-              <div className="who-am-i-active-question">
-                <p>
-                  <strong>{nicknameFor(activeQuestion.asking_player_id)} asked:</strong>{" "}
-                  {activeQuestion.question_text}
-                </p>
-                <ul className="who-am-i-answer-summary">
-                  {Object.entries(activeQuestion.answers).map(([playerId, answer]) => (
-                    <li key={playerId}>
-                      {nicknameFor(playerId)}: <strong>{formatAnswer(answer)}</strong>
+            {turnState.phase === "reviewing" && turnQuestions.length > 0 && (
+              <div className="who-am-i-active-question who-am-i-turn-review">
+                <ul className="who-am-i-turn-review-list">
+                  {turnQuestions.map((q) => (
+                    <li key={q.id}>
+                      <p>
+                        <strong>
+                          {nicknameFor(q.asking_player_id)} asked{" "}
+                          {nicknameFor(q.target_player_id ?? "")}:
+                        </strong>{" "}
+                        {q.question_text}
+                      </p>
+                      <ul className="who-am-i-answer-summary">
+                        {Object.entries(q.answers).map(([playerId, answer]) => (
+                          <li key={playerId}>
+                            {nicknameFor(playerId)}: <strong>{formatAnswer(answer)}</strong>
+                          </li>
+                        ))}
+                      </ul>
                     </li>
                   ))}
                 </ul>
@@ -1133,7 +1164,11 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                 return (
                   <li key={q.id} className="who-am-i-log-entry">
                     <p className="who-am-i-log-question">
-                      <strong>{nicknameFor(q.asking_player_id)}:</strong> {q.question_text}
+                      <strong>
+                        {nicknameFor(q.asking_player_id)}
+                        {q.target_player_id ? ` asked ${nicknameFor(q.target_player_id)}` : ""}:
+                      </strong>{" "}
+                      {q.question_text}
                     </p>
                     {Object.keys(q.answers).length > 0 && (
                       <ul className="who-am-i-log-answers">

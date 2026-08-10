@@ -1,17 +1,27 @@
-// Submit a public question on your turn (SPEC.md §8 "Turn Loop" point 2).
-// Only the current asker (per the session's turn state) may call this, and
-// only while the loop is in the "asking" phase — see
+// Submit a question directed at your current 1:1 target on your turn
+// (SPEC.md §8 "Turn Loop" point 2, reinterpreted for real 1:1 targeting —
+// see games/who-am-i/logic/turnState.ts's file header). Only the current
+// asker (per the session's turn state) may call this, and only while the
+// loop is in the "asking" phase — see
 // app/api/games/who-am-i/_lib/turnSession.ts for how the caller/session are
 // resolved, and games/who-am-i/logic/turnState.ts for the phase transition
 // (`startAnswering`) this route drives.
 //
+// The target isn't taken from the request body — it's derived server-side
+// from `currentAskTargetId(state)`, the same turn state this route already
+// has to trust for "whose turn is it to ask." That way a compromised or
+// buggy client can't name a different target than the one the turn loop
+// actually has queued up.
+//
 // Writes go through the caller's own cookie-authenticated client, not the
 // admin client — `questions_log_insert_asker_only` (RLS) already requires
-// asking_player_id to equal the caller's own player id in this room, and
-// `game_sessions_update_room_members` already allows a room member to
-// write the new state. This route adds the one check RLS doesn't yet make:
-// that it's actually this player's turn to ask (see "Open RLS edge cases"
-// in supabase/migrations/20260806120400_rls_core.sql).
+// asking_player_id to equal the caller's own player id in this room (and,
+// as of the targeted-questions migration, that target_player_id names an
+// actual member of that room), and `game_sessions_update_room_members`
+// already allows a room member to write the new state. This route adds the
+// one check RLS doesn't yet make: that it's actually this player's turn to
+// ask, and that the target is actually who the turn loop expects (see
+// "Open RLS edge cases" in supabase/migrations/20260806120400_rls_core.sql).
 
 import { NextResponse } from "next/server";
 import {
@@ -19,7 +29,12 @@ import {
   loadSessionForTurn,
   saveTurnState,
 } from "@/app/api/games/who-am-i/_lib/turnSession";
-import { TurnStateError, currentAskerId, startAnswering } from "@/games/who-am-i/logic/turnState";
+import {
+  TurnStateError,
+  currentAskerId,
+  currentAskTargetId,
+  startAnswering,
+} from "@/games/who-am-i/logic/turnState";
 import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { stripUnsafeChars } from "@/lib/rooms";
 
@@ -78,11 +93,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "It isn't your turn to ask a question." }, { status: 403 });
     }
 
+    const targetPlayerId = currentAskTargetId(state);
+    if (!targetPlayerId) {
+      return NextResponse.json(
+        { error: "There's no one left to ask a question this turn." },
+        { status: 409 }
+      );
+    }
+
     const { data: questionRow, error: insertError } = await supabase
       .from("questions_log")
       .insert({
         session_id: sessionId,
         asking_player_id: callerPlayerId,
+        target_player_id: targetPlayerId,
         question_text: cleanQuestion,
       })
       .select("id")

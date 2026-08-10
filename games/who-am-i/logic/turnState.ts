@@ -12,14 +12,27 @@
 // Phase 6a shipped the ask/answer/done loop only and deliberately left
 // guessing/solved state and the game-end condition out — see that phase's
 // comment (now superseded below) about `advanceTurn` needing to learn to
-// skip already-solved players. This is that follow-up (Phase 6b, SPEC.md
-// §8 points 6-7): `turnOrder` still never shrinks or reorders — it's a
-// fixed ring for the whole session — but `solvedPlayerIds` now tracks who
-// has correctly guessed, and every transition that picks "who's up next"
-// skips them. A solved player is never removed from `turnOrder` itself
-// (they still need a stable seat to answer other players' questions from,
-// per SPEC.md §8 point 6: "removed from asking rotation but can remain to
-// answer others' questions") — only skipped when choosing the next asker.
+// skip already-solved players. Phase 6b (SPEC.md §8 points 6-7) added
+// `solvedPlayerIds`: it tracks who has correctly guessed, and every
+// transition that picks "who's up next" skips them. A solved player is
+// never removed from `turnOrder` itself (they still need a stable seat to
+// answer other players' questions from, per SPEC.md §8 point 6: "removed
+// from asking rotation but can remain to answer others' questions") —
+// only skipped when choosing the next asker.
+//
+// This revision replaces the *broadcast* question model (one public
+// question per turn, every other player answers it in sequence) with real
+// 1:1 targeting: the active player asks a DIFFERENT question to EACH other
+// player, one at a time. `answeringOrder` still means the same thing it
+// always did — the fixed rotation of who gets a turn in the spotlight this
+// round — but now each entry in it gets its own ask/answer cycle instead
+// of all of them answering one shared question. See `answeringOrder` and
+// `answeringIndex` below, and `startAnswering`/`advanceAfterAnswer` for the
+// transitions this drives. `answeringOrder` is now built up front, for the
+// whole turn, the moment a new asker's turn begins (`initialTurnState` /
+// `resetToNextAsker`) rather than lazily when the first (and, previously,
+// only) question of the turn was submitted — the asker needs to know who
+// they're composing a question *for* before they've written one.
 
 export type WhoAmITurnPhase = "asking" | "answering" | "reviewing";
 
@@ -53,12 +66,41 @@ export interface WhoAmITurnState {
   /** Index into turnOrder of the player whose turn it currently is. */
   currentTurnIndex: number;
   phase: WhoAmITurnPhase;
-  /** questions_log.id of the question currently being asked/answered. */
+  /**
+   * questions_log.id of the question currently being asked/answered — i.e.
+   * the question directed at `answeringOrder[answeringIndex]`. Null
+   * whenever the asker hasn't yet submitted THAT responder's question
+   * (phase "asking" and this isn't the very first responder of the turn,
+   * or the turn has just started).
+   */
   activeQuestionId: string | null;
-  /** Responder player ids for the active question, in answering order. */
+  /**
+   * The fixed rotation of who gets individually asked a question this
+   * turn — same rotation semantics as always (starts with whoever is next
+   * after the asker in `turnOrder`, wraps around), but now built once, up
+   * front, for the whole turn (see `resetToNextAsker`) rather than derived
+   * from a single shared question.
+   */
   answeringOrder: string[];
-  /** Index into answeringOrder of whose turn it is to answer next. */
+  /**
+   * Index into `answeringOrder` of whoever currently has the spotlight —
+   * being composed a question for (phase "asking", after the very first
+   * target) or actively answering one (phase "answering"). Advances by one
+   * every time a question gets fully answered; once it reaches
+   * `answeringOrder.length`, every responder has had their own question
+   * this turn and the phase moves to "reviewing".
+   */
   answeringIndex: number;
+  /**
+   * questions_log.id values asked so far THIS turn, in order — one per
+   * `answeringOrder` entry once the turn is complete. Reset to `[]`
+   * whenever a new asker's turn begins. This is what the review screen
+   * (SPEC.md §8 point 4: "reviews the public answers") reads to show every
+   * question+answer from the turn, not just the last one — with one
+   * question per responder there's no longer a single "the" active
+   * question left standing by the time review happens.
+   */
+  turnQuestionIds: string[];
   /**
    * Player ids who have correctly guessed their own character, in the
    * order they solved it (SPEC.md §8 point 7: recap shows "in what
@@ -89,13 +131,15 @@ export function initialTurnState(
     // fall back rather than trust a client that bypassed the disabled UI.
     gameMode = "last-standing-loses";
   }
+  const firstAskerId = turnOrder[0]!;
   return {
     turnOrder: [...turnOrder],
     currentTurnIndex: 0,
     phase: "asking",
     activeQuestionId: null,
-    answeringOrder: [],
+    answeringOrder: buildAnsweringOrder(turnOrder, firstAskerId),
     answeringIndex: 0,
+    turnQuestionIds: [],
     solvedPlayerIds: [],
     gameMode,
   };
@@ -119,6 +163,8 @@ export function isWhoAmITurnState(value: unknown): value is WhoAmITurnState {
     Array.isArray(v.answeringOrder) &&
     v.answeringOrder.every((id) => typeof id === "string") &&
     typeof v.answeringIndex === "number" &&
+    Array.isArray(v.turnQuestionIds) &&
+    v.turnQuestionIds.every((id) => typeof id === "string") &&
     Array.isArray(v.solvedPlayerIds) &&
     v.solvedPlayerIds.every((id) => typeof id === "string") &&
     (v.gameMode === "last-standing-loses" || v.gameMode === "first-out-wins")
@@ -131,6 +177,20 @@ export function currentAskerId(state: WhoAmITurnState): string | null {
 
 export function currentResponderId(state: WhoAmITurnState): string | null {
   if (state.phase !== "answering") return null;
+  return state.answeringOrder[state.answeringIndex] ?? null;
+}
+
+/**
+ * Who the asker should be composing/has just submitted a question FOR —
+ * i.e. the 1:1 target — while `phase` is "asking". Same underlying index
+ * as `currentResponderId`, just valid during the other phase: "asking"
+ * means "about to (or has just started to) ask this person," "answering"
+ * means "this person is now answering." Null once every responder in
+ * `answeringOrder` has already had their question this turn (which is
+ * exactly when `phase` should already have moved to "reviewing").
+ */
+export function currentAskTargetId(state: WhoAmITurnState): string | null {
+  if (state.phase !== "asking") return null;
   return state.answeringOrder[state.answeringIndex] ?? null;
 }
 
@@ -224,24 +284,31 @@ function nextAskerIndex(state: WhoAmITurnState): number {
 
 /**
  * Shared tail end of both `advanceTurn` ("I'm Done") and `submitGuess`:
- * reset to a fresh "asking" phase for whichever unsolved player is next.
+ * reset to a fresh "asking" phase for whichever unsolved player is next,
+ * and build THEIR answeringOrder up front for the whole turn (see
+ * `WhoAmITurnState.answeringOrder`'s doc comment for why this happens
+ * eagerly now instead of lazily on the first submitted question).
  */
 function resetToNextAsker(state: WhoAmITurnState): WhoAmITurnState {
+  const nextIndex = nextAskerIndex(state);
+  const nextAskerId = state.turnOrder[nextIndex]!;
   return {
     ...state,
-    currentTurnIndex: nextAskerIndex(state),
+    currentTurnIndex: nextIndex,
     phase: "asking",
     activeQuestionId: null,
-    answeringOrder: [],
+    answeringOrder: buildAnsweringOrder(state.turnOrder, nextAskerId),
     answeringIndex: 0,
+    turnQuestionIds: [],
   };
 }
 
 /**
- * Every player except the asker answers, one at a time (SPEC.md §8 point
- * 3). Order starts with whoever is next after the asker in turnOrder and
- * wraps around — an arbitrary but stable choice; nothing in the spec
- * requires a specific responder order, only that it's sequential.
+ * Every player except the asker gets individually asked a question, one at
+ * a time (SPEC.md §8 point 3, reinterpreted for real 1:1 targeting — see
+ * this file's header). Order starts with whoever is next after the asker
+ * in turnOrder and wraps around — an arbitrary but stable choice; nothing
+ * in the spec requires a specific order, only that it's sequential.
  */
 export function buildAnsweringOrder(turnOrder: readonly string[], askerId: string): string[] {
   const askerIndex = turnOrder.indexOf(askerId);
@@ -253,10 +320,14 @@ export function buildAnsweringOrder(turnOrder: readonly string[], askerId: strin
 }
 
 /**
- * Transition: asker submits a public question -> everyone else starts
- * answering in sequence. Throws if it isn't actually the asking phase,
- * so a caller (the API route) can turn that into a 409 rather than
- * silently corrupting state.
+ * Transition: asker submits a question targeted at the current responder
+ * (`currentAskTargetId`) -> that one player starts answering it. Throws if
+ * it isn't actually the asking phase, or if there's no target left to ask
+ * (every responder in `answeringOrder` already got their question this
+ * turn — shouldn't happen since `phase` would already be "reviewing" by
+ * then, but this keeps the invariant enforced rather than assumed), so a
+ * caller (the API route) can turn either into a 409 rather than silently
+ * corrupting state.
  */
 export function startAnswering(state: WhoAmITurnState, questionId: string): WhoAmITurnState {
   if (state.phase !== "asking") {
@@ -266,23 +337,26 @@ export function startAnswering(state: WhoAmITurnState, questionId: string): WhoA
   if (!askerId) {
     throw new TurnStateError("No current asker.");
   }
-  const answeringOrder = buildAnsweringOrder(state.turnOrder, askerId);
-  if (answeringOrder.length === 0) {
-    throw new TurnStateError("No other players available to answer.");
+  const targetId = currentAskTargetId(state);
+  if (!targetId) {
+    throw new TurnStateError("No target left to ask a question this turn.");
   }
   return {
     ...state,
     phase: "answering",
     activeQuestionId: questionId,
-    answeringOrder,
-    answeringIndex: 0,
+    turnQuestionIds: [...state.turnQuestionIds, questionId],
   };
 }
 
 /**
- * Transition: the current responder answers. Advances to the next
- * responder, or — once everyone has answered — flips to "reviewing" so
- * the asker can update their board and press "I'm Done."
+ * Transition: the current responder answers THEIR OWN targeted question.
+ * Advances the spotlight to the next responder in `answeringOrder` — back
+ * to "asking" so the active player can compose a fresh question for that
+ * next person — or, once every responder has had their turn, flips to
+ * "reviewing" so the asker can look back over all of this turn's
+ * questions/answers (see `turnQuestionIds`), update their board, and press
+ * "I'm Done."
  */
 export function advanceAfterAnswer(state: WhoAmITurnState): WhoAmITurnState {
   if (state.phase !== "answering") {
@@ -290,9 +364,9 @@ export function advanceAfterAnswer(state: WhoAmITurnState): WhoAmITurnState {
   }
   const nextIndex = state.answeringIndex + 1;
   if (nextIndex >= state.answeringOrder.length) {
-    return { ...state, phase: "reviewing", answeringIndex: nextIndex };
+    return { ...state, phase: "reviewing", answeringIndex: nextIndex, activeQuestionId: null };
   }
-  return { ...state, answeringIndex: nextIndex };
+  return { ...state, phase: "asking", answeringIndex: nextIndex, activeQuestionId: null };
 }
 
 /**
@@ -329,14 +403,22 @@ export function advanceTurn(state: WhoAmITurnState): WhoAmITurnState {
  * same as pressing "I'm Done" — see SPEC.md §8 point 6: a wrong guess
  * just "wastes the turn," and a right one has nothing left to do this
  * turn since the player is now solved.
+ *
+ * With real 1:1 targeting, `phase` returns to "asking" between EACH
+ * responder's question within the same turn (see `advanceAfterAnswer`) —
+ * not just once, like the old broadcast model. So "before you've asked
+ * your question this turn" now also requires `turnQuestionIds` to still
+ * be empty, not just `phase === "asking"` — otherwise a player could ask
+ * one responder, see their answer, and only then decide to guess, which
+ * is exactly the "ask, then guess" sequence this was written to prevent.
  */
 export function submitGuess(
   state: WhoAmITurnState,
   guesserId: string,
   correct: boolean
 ): WhoAmITurnState {
-  if (state.phase !== "asking") {
-    throw new TurnStateError(`Cannot guess during phase "${state.phase}".`);
+  if (state.phase !== "asking" || state.turnQuestionIds.length > 0) {
+    throw new TurnStateError("You can only guess before asking a question this turn.");
   }
   if (currentAskerId(state) !== guesserId) {
     throw new TurnStateError("It isn't your turn to guess.");

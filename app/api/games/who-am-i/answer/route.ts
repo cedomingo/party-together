@@ -1,7 +1,8 @@
-// Submit a yes/no answer to the active question, one responder at a time
-// (SPEC.md §8 "Turn Loop" point 3). Only the player whose turn it is to
-// answer (per the session's turn state) may call this, and only while the
-// loop is in the "answering" phase.
+// Submit a yes/no answer to the question directed at you, one responder at
+// a time (SPEC.md §8 "Turn Loop" point 3, reinterpreted for real 1:1
+// targeting — see games/who-am-i/logic/turnState.ts's file header). Only
+// the player whose turn it is to answer (per the session's turn state) may
+// call this, and only while the loop is in the "answering" phase.
 //
 // `answers` is a jsonb map on questions_log ({ player_id: 'yes'|'no' }),
 // not a normal relational column, so "add my answer" is a read-modify-
@@ -9,9 +10,15 @@
 // `questions_log_update_room_members` RLS policy comment already flags
 // ("this doesn't yet stop one member from clobbering another's answer").
 // This route narrows that window as much as it reasonably can without a
-// schema change: it re-checks the responder-order invariant against the
-// state it just read, and rejects a second answer from the same player
-// for the same question outright.
+// bigger schema change: it re-checks the responder-order invariant against
+// the state it just read, confirms the active question's own
+// `target_player_id` is actually the caller (not just that turnState
+// *thinks* it's their turn — belt and suspenders against the two ever
+// drifting apart), and rejects a second answer from the same player for
+// the same question outright. With one question now always aimed at
+// exactly one player, `answers` should only ever end up with a single
+// entry, but the map shape is kept as-is — see the targeted-questions
+// migration's comment for why.
 
 import { NextResponse } from "next/server";
 import {
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
 
     const { data: questionRow, error: questionError } = await supabase
       .from("questions_log")
-      .select("id, session_id, answers, resolved")
+      .select("id, session_id, target_player_id, answers, resolved")
       .eq("id", state.activeQuestionId)
       .maybeSingle();
 
@@ -109,8 +116,18 @@ export async function POST(request: Request) {
         status: 409,
       });
     }
+    if (questionRow.target_player_id !== callerPlayerId) {
+      // Belt-and-suspenders: turnState already said it's this player's
+      // turn to answer, but this question's own target should always
+      // agree — if it doesn't, something's drifted and this is the
+      // caller's fault either way (stale client state), not a 500.
+      return NextResponse.json(
+        { error: "This question isn't addressed to you." },
+        { status: 403 }
+      );
+    }
     if (questionRow.resolved) {
-      return NextResponse.json({ error: "This question has already been fully answered." }, {
+      return NextResponse.json({ error: "This question has already been answered." }, {
         status: 409,
       });
     }
@@ -121,13 +138,16 @@ export async function POST(request: Request) {
     }
 
     const nextState = advanceAfterAnswer(state);
-    const nowResolved = nextState.phase === "reviewing";
 
     const { error: updateError } = await supabase
       .from("questions_log")
       .update({
+        // A targeted question only ever gets one answer — from
+        // target_player_id, just confirmed above — so this always
+        // resolves it outright rather than waiting on other responders
+        // the way the old broadcast model did.
         answers: { ...existingAnswers, [callerPlayerId]: cleanAnswer },
-        resolved: nowResolved,
+        resolved: true,
       })
       .eq("id", state.activeQuestionId);
 
