@@ -17,16 +17,16 @@
   --font-body: "Quicksand", ui-rounded, system-ui, sans-serif;
 
   /* ---- Palette (warm cream base + muted earthy accents) ----------------- */
-  --cream: #f5eedc; /* page background — aged/parchment paper */
-  --paper: #fbf6e8; /* card & panel surface, a shade lighter than the page */
+  --cream: #fdf5ec; /* page background — aged/parchment paper */
+  --paper: #fefaf4; /* card & panel surface, a shade lighter than the page */
   --ink: #2f2a22; /* body text + hand-inked outlines */
   --ink-70: rgba(47, 42, 34, 0.72);
   --ink-45: rgba(47, 42, 34, 0.45);
   --ink-18: rgba(47, 42, 34, 0.18);
 
-  --olive: #7d8645;
-  --lavender: #80709d;
-  --mustard: #d9a52f;
+  --olive: #b3ae64;
+  --lavender: #bcabdd;
+  --mustard: #eaa839;
   --coral: #c96f69;
   --blue: #7894a8;
 
@@ -44,7 +44,7 @@
      shade of the same coral family: ~4.55:1 against --cream, and ~4.55:1
      again for --cream text sitting on a --danger background. Passes AA
      both ways this file actually uses it. */
-  --danger: #9b5a54;
+  --danger: #f35351;
 
   /* Same reasoning, for the "positive" case (a correct guess): plain
      --olive is only ~3.4:1 against --cream. This deepened moss shade
@@ -779,7 +779,7 @@ button:disabled {
   max-width: 1180px;
   margin: 0 auto 1rem;
   padding: 0.85rem 1.1rem;
-  background: var(--card-surface);
+  background: var(--paper);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-flat-sm);
@@ -1278,7 +1278,7 @@ button:disabled {
 .who-am-i-guess-hint {
   margin: 0 0 0.6rem;
   font-weight: 600;
-  color: var(--special);
+  color: var(--blue);
 }
 
 /* The blueboard art asset as the deck's background, like the reference
