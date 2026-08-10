@@ -350,6 +350,13 @@ button:hover:not(:disabled) {
   box-shadow: 4px 5px 0 rgba(47, 42, 34, 0.2);
 }
 
+
+.who-am-i-card:hover:not(:disabled) {
+  background: var(--card-surface);   /* keep the white card background, no yellow tint */
+  transform: translate(-1px, -1px);  /* keep the lift if you want it, or remove this line too */
+  box-shadow: 4px 5px 0 rgba(47, 42, 34, 0.2);  /* keep just the shadow */
+}
+
 button:active:not(:disabled) {
   transform: translate(1px, 2px);
   box-shadow: 1px 1px 0 rgba(47, 42, 34, 0.2);
@@ -967,7 +974,7 @@ button:disabled {
 
 .who-am-i-layout {
   display: grid;
-  grid-template-columns: 220px 340px 1fr;
+  grid-template-columns: 72px 300px 1fr;
   grid-template-areas: "sidebar chat deck";
   gap: 1rem;
   max-width: 1180px;
@@ -1203,7 +1210,7 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: -6rem;
 }
 
 .who-am-i-deck-header h2 {
@@ -1251,37 +1258,49 @@ button:disabled {
    outline around the table itself (design spec) — the art and card
    shadows carry the edge instead. */
 .who-am-i-deck-board {
-  background-image: url("/characters/components/blueboard.png");
-  background-size: cover;
-  background-position: center;
-  border: none;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-flat);
-  padding: 1.25rem;
+  background-image: url("/characters/components/blueboard.png"); /* the board artwork itself */
+  background-size: contain;        /* scales the image to fit inside the box with NO cropping */
+  background-repeat: no-repeat;    /* stops the image from tiling if it doesn't fill the box */
+  background-position: center;     /* where the image sits inside the box if there's empty space around it */
+  aspect-ratio: 1 / 1;             /* forces the box to always be a square (matches your 5x5 board) */
+  border: none;                    /* no outline around the box */
+  border-radius: 0;                /* square corners, no rounding */
+  box-shadow: none;                /* no drop-shadow "frame" around the box */
+  padding: 4.5rem 3rem 1.9rem;    /* TOP | LEFT-RIGHT | BOTTOM — empty space between the box edge
+                                       and the card grid inside it. This is what keeps cards from
+                                       touching/overflowing the board's curved edges. Raise the
+                                       middle (side) value if cards still poke past left/right. */
+  display: flex;                   /* lets align-items below work */
+  align-items: center;             /* vertically centers the grid within the board's height */
 }
 
 .who-am-i-grid {
-  list-style: none;
+  list-style: none;                /* removes bullet points (it's a <ul>) */
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.85rem;
+  display: grid;                   /* turns this into a CSS grid layout */
+  grid-template-columns: repeat(5, 1fr); /* LOCKS to exactly 5 equal-width columns — this is your "5x5" rule */
+  justify-items: center;           /* centers each card within its column cell, instead of stretching to fill it —
+                                       this is what lets .who-am-i-card have its OWN fixed width below */
+  gap: 0.3rem 0rem;             /* ROW-GAP | COLUMN-GAP — space between cards. Lower = tighter grid.
+                                       This is the "gap" you asked about. */
+  width: 100%;                     /* grid fills the full width available inside the board's padding */
 }
 
 .who-am-i-card {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  width: 100%;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--card-surface);
-  border: 2px solid var(--border);
-  color: inherit;
-  text-align: center;
-  box-shadow: var(--shadow-flat-sm);
+  flex-direction: column;          /* stacks image above name, vertically */
+  align-items: center;             /* centers image/name horizontally within the card */
+  gap: 0rem;                    /* space BETWEEN the image and the name text, inside one card */
+  width: 100px;                    /* ← THE CARD SIZE DIAL. Fixed pixel width — bigger number = bigger card.
+                                       Not tied to the grid columns because of justify-items above. */
+  padding: 0.3rem;                 /* inner breathing room between the card's edge and its image/text */
+  border-radius: var(--radius-sm); /* rounded corners on the white card tile */
+  background: var(--card-surface); /* the white tile background color */
+  border: 2px solid var(--border); /* the dark outline around each card */
+  color: inherit;                  /* text color inherits from parent instead of default link/button blue */
+  text-align: center;              /* centers the name text under the image */
+  box-shadow: var(--shadow-flat-sm); /* the small drop-shadow under each card, giving it a "raised" look */
 }
 
 .who-am-i-card-image {
