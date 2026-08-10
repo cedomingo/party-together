@@ -59,6 +59,16 @@ interface WhoAmIRecapProps {
   gameMode?: WhoAmIGameMode | null;
   winnerPlayerIds?: string[];
   loserPlayerIds?: string[];
+  /** Whether the CALLER (not necessarily anyone in `entries`) is this
+   * room's host — only the host can send everyone back to the lobby, same
+   * restriction as starting/ending the game itself. */
+  isHost: boolean;
+  /** Host-only: sends the room back to `lobby` so it can be re-invited to
+   * (app/api/games/who-am-i/play-again/route.ts). Non-hosts never see the
+   * control that would call this. */
+  onPlayAgain: () => void;
+  playAgainSubmitting: boolean;
+  playAgainError: string | null;
 }
 
 export function WhoAmIRecap({
@@ -70,6 +80,10 @@ export function WhoAmIRecap({
   gameMode = null,
   winnerPlayerIds = [],
   loserPlayerIds = [],
+  isHost,
+  onPlayAgain,
+  playAgainSubmitting,
+  playAgainError,
 }: WhoAmIRecapProps) {
   const solved = entries.filter((entry) => entry.rank !== null);
   const unsolved = entries.filter((entry) => entry.rank === null);
@@ -217,15 +231,33 @@ export function WhoAmIRecap({
         </div>
       )}
 
-      {/* Not wired up yet — just the UI for now. */}
+      {/* "Play Again" sends the room back to the lobby (host-only — see
+          onPlayAgain's doc comment on WhoAmIRecapProps) so the host can
+          invite people again before starting a fresh round. Non-hosts get
+          a waiting note instead of a dead button. "More Games" is still
+          just a UI stub. */}
       <div className="who-am-i-recap-actions">
-        <button type="button" className="who-am-i-btn-outline" onClick={() => {}}>
-          Play Again
-        </button>
+        {isHost ? (
+          <button
+            type="button"
+            className="who-am-i-btn-outline"
+            onClick={onPlayAgain}
+            disabled={playAgainSubmitting}
+          >
+            {playAgainSubmitting ? "Starting…" : "Play Again"}
+          </button>
+        ) : (
+          <p className="muted who-am-i-recap-waiting">Waiting for the host to start a new game…</p>
+        )}
         <button type="button" className="who-am-i-btn-outline" onClick={() => {}}>
           More Games
         </button>
       </div>
+      {playAgainError && (
+        <p className="field-error" role="alert">
+          {playAgainError}
+        </p>
+      )}
     </section>
   );
 }

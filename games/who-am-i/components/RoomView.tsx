@@ -211,6 +211,16 @@ export function WhoAmIRoomView({
   const [endGameSubmitting, setEndGameSubmitting] = useState(false);
   const [endGameError, setEndGameError] = useState<string | null>(null);
 
+  // ---- recap: host "Play Again" (sends the room back to the lobby so
+  // players can be invited again — see handlePlayAgain below) -------------
+  const [playAgainSubmitting, setPlayAgainSubmitting] = useState(false);
+  const [playAgainError, setPlayAgainError] = useState<string | null>(null);
+
+  // ---- Player Log: collapsed to the single most recent line by default,
+  // expands to the full scrollable list on hover or click/tap (see the
+  // render section below for the collapsed/expanded markup). ---------------
+  const [playerLogExpanded, setPlayerLogExpanded] = useState(false);
+
   // ---- messaging-app-style UI: which conversation is open, and whether
   // the deck is currently in "tap a card to guess" mode (replaces the old
   // guess <select> — SPEC.md restructure request) --------------------------
@@ -741,10 +751,43 @@ export function WhoAmIRoomView({
     }
   }
 
-  // ---- top bar: "Leave Game" (client-side only — just navigates the
-  // player back home; the disconnect itself is already handled by the
-  // pagehide/visibility effects above the same way any other tab-close
-  // would be) --------------------------------------------------------------
+  // ---- recap: host "Play Again" -------------------------------------------
+  // Sends the room back to `lobby` (app/api/games/who-am-i/play-again/
+  // route.ts, host-only) so the host can invite/re-invite players and start
+  // a fresh round — mirrors handleEndGame's shape but there's nothing to
+  // confirm here (unlike ending a live game, restarting from the recap
+  // screen isn't destructive). No local "success" handling is needed
+  // either: RoomClient's own postgres_changes subscription on `rooms`
+  // picks up the status flip to "lobby" and swaps this whole component out
+  // for the lobby view for every player in the room, host included.
+  async function handlePlayAgain() {
+    setPlayAgainSubmitting(true);
+    setPlayAgainError(null);
+    try {
+      const response = await fetch("/api/games/who-am-i/play-again", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: room.id }),
+      });
+      const payload = await response.json().catch(() => ({}) as { error?: string });
+      if (!response.ok) throw new Error(payload.error ?? "Failed to start a new game.");
+      // Leave playAgainSubmitting true — the button should stay disabled
+      // until RoomClient swaps this component out for the lobby view a
+      // moment later. If that swap never happens (e.g. a stale realtime
+      // connection), the error catch below never fires either, but that's
+      // an existing platform-wide limitation of this room's realtime
+      // wiring, not something specific to this button.
+    } catch (err) {
+      setPlayAgainError(err instanceof Error ? err.message : "Failed to start a new game.");
+      setPlayAgainSubmitting(false);
+    }
+  }
+
+  // ---- top bar: "Leave Game" — non-host players only (the host sees "End
+  // Game" in this same slot instead, wired to handleEndGame above). Purely
+  // client-side — just navigates the player back home; the disconnect
+  // itself is already handled by the pagehide/visibility effects above the
+  // same way any other tab-close would be. --------------------------------
   function handleLeaveGame() {
     requestConfirm(
       "Leave this game and go back home?",
@@ -1079,6 +1122,10 @@ export function WhoAmIRoomView({
         gameMode={turnState?.gameMode ?? null}
         winnerPlayerIds={outcome?.winnerPlayerIds ?? []}
         loserPlayerIds={outcome?.loserPlayerIds ?? []}
+        isHost={currentPlayer.is_host}
+        onPlayAgain={handlePlayAgain}
+        playAgainSubmitting={playAgainSubmitting}
+        playAgainError={playAgainError}
       />
     );
   }
@@ -1152,33 +1199,63 @@ export function WhoAmIRoomView({
             </svg>
             How to Play
           </button>
-          <button type="button" className="who-am-i-btn-leave" onClick={handleLeaveGame}>
-            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
-              <path
-                d="M8 4H4.75A.75.75 0 0 0 4 4.75v10.5c0 .414.336.75.75.75H8"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12.5 13.5 16 10l-3.5-3.5M16 10H8"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Leave Game
-          </button>
+          {/* Host gets "End Game" here instead of "Leave Game" — this is
+              now the host's ONLY end-game control (the separate "End game
+              (host)" button that used to live in the status strip below
+              was removed as a duplicate). A host who just wants to leave
+              without ending the game for everyone else can still close the
+              tab; the status-dot / disconnect handling above already
+              covers that. */}
+          {currentPlayer.is_host ? (
+            <button
+              type="button"
+              className="who-am-i-btn-leave"
+              onClick={handleEndGame}
+              disabled={endGameSubmitting}
+            >
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.6" />
+                <path
+                  d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {endGameSubmitting ? "Ending…" : "End Game"}
+            </button>
+          ) : (
+            <button type="button" className="who-am-i-btn-leave" onClick={handleLeaveGame}>
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                <path
+                  d="M8 4H4.75A.75.75 0 0 0 4 4.75v10.5c0 .414.336.75.75.75H8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M12.5 13.5 16 10l-3.5-3.5M16 10H8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Leave Game
+            </button>
+          )}
         </div>
       </header>
 
       {/* Secondary, only-when-relevant status strip — presence hint, typing
-          indicator, live activity feed, solved note, guess result, and the
-          host's "End Game" control. Layered below the compact top bar
-          rather than crowding it (SPEC.md §9/§11 still want all of this
-          surfaced, just not in the primary header). */}
+          indicator, live activity feed, solved note, and guess result.
+          Layered below the compact top bar rather than crowding it
+          (SPEC.md §9/§11 still want all of this surfaced, just not in the
+          primary header). The host's "End Game" control used to live here
+          too — it's now merged into the top bar's Leave/End Game button
+          above, so this strip is fully spectator-safe (nothing host-only
+          left in it). */}
       {turnState && (
         <div className="who-am-i-status-strip">
           {activeTurnPlayerOffline && (
@@ -1210,17 +1287,10 @@ export function WhoAmIRoomView({
             </p>
           )}
 
-          {currentPlayer.is_host && (
-            <div className="who-am-i-host-controls">
-              {endGameError && (
-                <p className="field-error" role="alert">
-                  {endGameError}
-                </p>
-              )}
-              <button type="button" onClick={handleEndGame} disabled={endGameSubmitting}>
-                {endGameSubmitting ? "Ending…" : "End game (host)"}
-              </button>
-            </div>
+          {currentPlayer.is_host && endGameError && (
+            <p className="field-error" role="alert">
+              {endGameError}
+            </p>
           )}
         </div>
       )}
@@ -1524,14 +1594,39 @@ export function WhoAmIRoomView({
           )}
         </section>
 
-        {/* ---- Player logs: who asked/answered/ended their turn, most
+        {/* ---- Player log: who asked/answered/ended their turn, most
               recent first — moved here below the chat block per design
-              request. */}
+              request. Collapsed by default to just that most-recent line
+              (CSS clips everything below it) so it doesn't compete with
+              the chat panel for space; hovering (mouse) or clicking/
+              tapping (touch, or a pin-it-open click on desktop) reveals
+              the full scrollable history via `.who-am-i-player-log-
+              expanded` / the CSS :hover rule right next to it in
+              globals.css. `liveEvents` itself is oldest-first (see
+              broadcastEvents.ts), so it's reversed here for display. */}
         {liveEvents.length > 0 && (
-          <div className="who-am-i-player-log" aria-label="Player activity log">
-            <h3 className="who-am-i-player-log-heading">Player Log</h3>
+          <div
+            className={`who-am-i-player-log${playerLogExpanded ? " who-am-i-player-log-expanded" : ""}`}
+            aria-label="Player activity log"
+            role="button"
+            tabIndex={0}
+            aria-expanded={playerLogExpanded}
+            onClick={() => setPlayerLogExpanded((v) => !v)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setPlayerLogExpanded((v) => !v);
+              }
+            }}
+          >
+            <h3 className="who-am-i-player-log-heading">
+              Player Log
+              <span aria-hidden="true" className="who-am-i-player-log-toggle">
+                {playerLogExpanded ? "▾" : "▸"}
+              </span>
+            </h3>
             <ul className="who-am-i-live-feed" aria-live="polite">
-              {liveEvents.map((event) => (
+              {[...liveEvents].reverse().map((event) => (
                 <li key={event.id}>{describeTurnEvent(event)}</li>
               ))}
             </ul>

@@ -935,9 +935,11 @@ button:disabled {
   background: color-mix(in srgb, var(--danger) 85%, black);
 }
 
-/* ---- Secondary status strip: presence/typing/live-feed/solved/guess
-   result/host controls — everything the compact top bar doesn't have
-   room for, shown only when relevant. */
+/* ---- Secondary status strip: presence/typing/solved/guess result —
+   everything the compact top bar doesn't have room for, shown only when
+   relevant. The host's end-game control used to live here too; it's now
+   merged into the top bar's Leave/End Game button (see
+   .who-am-i-btn-leave), so this strip no longer has any host-only UI. */
 .who-am-i-status-strip {
   display: flex;
   flex-direction: column;
@@ -946,12 +948,6 @@ button:disabled {
   max-width: 1180px;
   margin: 0 auto 1rem;
   text-align: center;
-}
-
-.who-am-i-status-strip .who-am-i-host-controls {
-  align-items: center;
-  border-top: none;
-  padding-top: 0;
 }
 
 /* ---- How to Play modal ------------------------------------------------- */
@@ -1102,7 +1098,10 @@ button:disabled {
   min-width: 0;
 }
 
-/* ---- Chat panel: full history with the selected player ---------------- */
+/* ---- Chat panel: full history with the selected player. Fixed `height`
+   (not a min/max range) so this never grows as a conversation gets longer
+   — new messages just scroll inside `.who-am-i-chat-messages` below,
+   which is the actual scroll container. ------------------------------------ */
 .who-am-i-chat-panel {
   display: flex;
   flex-direction: column;
@@ -1110,20 +1109,34 @@ button:disabled {
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-flat-sm);
-  min-height: 420px;
-  max-height: 640px;
+  height: 640px;
   overflow: hidden;
 }
 
 /* ---- Player log: who asked/answered/ended their turn, below the chat
    panel (moved out of the top status strip). Same card treatment as the
-   sidebar/chat panel so it reads as part of the same column. ------------- */
+   sidebar/chat panel so it reads as part of the same column.
+   Collapsed by default — `max-height` only leaves room for the heading
+   plus the single most-recent line (the list itself is rendered most-
+   recent-first in RoomView.tsx, so that's always the first `<li>`), with
+   everything after it clipped by `overflow: hidden`. Hovering, or the
+   `-expanded` modifier RoomView.tsx toggles on click/tap, opens it up to
+   the full scrollable history. */
 .who-am-i-player-log {
   background: var(--paper);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-flat-sm);
   padding: 0.65rem 0.8rem;
+  max-height: 3.9rem;
+  overflow: hidden;
+  cursor: pointer;
+  transition: max-height 0.15s ease;
+}
+
+.who-am-i-player-log:hover,
+.who-am-i-player-log:focus-visible,
+.who-am-i-player-log.who-am-i-player-log-expanded {
   max-height: 220px;
   overflow-y: auto;
 }
@@ -1134,6 +1147,16 @@ button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--ink-45);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.who-am-i-player-log-toggle {
+  font-size: 0.7rem;
+  color: var(--ink-45);
+  flex-shrink: 0;
 }
 
 .who-am-i-chat-empty {
@@ -1197,6 +1220,11 @@ button:disabled {
 
 .who-am-i-chat-messages {
   flex: 1;
+  /* Without this, a flex item's default auto min-height can let its
+     content (a long back-and-forth) push past the panel's fixed height
+     instead of scrolling inside it — this is what keeps the panel itself
+     pinned at a constant size no matter how long the conversation gets. */
+  min-height: 0;
   overflow-y: auto;
   padding: 0.8rem;
   display: flex;
@@ -1599,20 +1627,6 @@ button:disabled {
   color: var(--ink-70);
 }
 
-.who-am-i-host-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  padding-top: 0.6rem;
-  border-top: 2px dashed var(--ink-18);
-}
-
-.who-am-i-host-controls button {
-  background: var(--danger);
-  color: var(--cream);
-}
-
 /* "Who Am I?" — Recap screen (SPEC.md §8 point 7). */
 .who-am-i-recap {
   margin-top: 0.5rem;
@@ -1726,11 +1740,13 @@ button:disabled {
   color: var(--cream);
 }
 
-/* ---- Recap end-screen actions (Play Again / More Games) — not wired up
-   to anything yet, just the UI. ------------------------------------------ */
+/* ---- Recap end-screen actions. "Play Again" (host-only) sends the room
+   back to the lobby — see Recap.tsx's onPlayAgain. "More Games" is still
+   just UI, not wired to anything yet. -------------------------------------- */
 .who-am-i-recap-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.6rem;
   margin-top: 1.5rem;
   padding-top: 1.25rem;
@@ -1740,6 +1756,14 @@ button:disabled {
 .who-am-i-recap-actions button {
   flex: 1;
   min-width: 160px;
+}
+
+/* Shown to non-host players in place of the "Play Again" button — only
+   the host can send the room back to the lobby. */
+.who-am-i-recap-waiting {
+  flex: 1;
+  min-width: 160px;
+  margin: 0;
 }
 
 /* ---------------------------------------------------------------------
@@ -1853,15 +1877,13 @@ button:disabled {
     padding: 0.5rem 0.6rem 1rem;
   }
 
-  /* Two side-by-side action buttons (Yes/No, or a form's own submit next
-     to a host control) are the main place `width: fit-content` (the
-     button default) produces awkward thumb-reach targets on a narrow
-     screen — stack them instead. `.who-am-i-answer-buttons` already grows
-     them to fill the row (see the `flex: 1` rule above) rather than
-     stacking, since Yes/No specifically reads better side-by-side even
+  /* A form's own submit button is the main place `width: fit-content`
+     (the button default) produces awkward thumb-reach targets on a narrow
+     screen — stack it instead. `.who-am-i-answer-buttons` already grows
+     Yes/No/Other to fill the row (see the `flex: 1` rule above) rather
+     than stacking, since those specifically read better side-by-side even
      on a phone; this only affects the rest.
      */
-  .who-am-i-host-controls,
   .room-header {
     align-items: stretch;
   }
