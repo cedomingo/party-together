@@ -57,6 +57,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { AvatarIcon } from "@/app/components/AvatarIcon";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { GameRoomViewProps } from "@/lib/games-registry";
@@ -149,8 +150,16 @@ type LoadState = "loading" | "ready" | "not-started" | "no-assignment" | "error"
 
 const MAX_QUESTION_LENGTH = 280;
 
-export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: GameRoomViewProps) {
+export function WhoAmIRoomView({
+  gameConfig,
+  room,
+  players,
+  currentPlayer,
+  onlineIds,
+}: GameRoomViewProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const router = useRouter();
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
 
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -660,6 +669,15 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     }
   }
 
+  // ---- top bar: "Leave Game" (client-side only — just navigates the
+  // player back home; the disconnect itself is already handled by the
+  // pagehide/visibility effects above the same way any other tab-close
+  // would be) --------------------------------------------------------------
+  function handleLeaveGame() {
+    if (!window.confirm("Leave this game and go back home?")) return;
+    router.push("/");
+  }
+
   // ---- turn loop derived view state --------------------------------------
   const askerId = turnState ? currentAskerId(turnState) : null;
   const responderId = turnState ? currentResponderId(turnState) : null;
@@ -811,6 +829,55 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   const activeTurnPlayerOffline =
     !!activeTurnPlayerId && activeTurnPlayerId !== currentPlayer.id && !onlineIds.has(activeTurnPlayerId);
 
+  // ---- top bar: round counter + status pill -------------------------------
+  // "Round" here is a player's turn at asking, one full lap of `turnOrder`
+  // per game — there's no separate round counter in the data model, but
+  // `currentTurnIndex`/`turnOrder.length` already mean exactly that (see
+  // ../logic/turnState.ts).
+  const totalRounds = turnState?.turnOrder.length ?? players.length;
+  const currentRound = turnState ? turnState.currentTurnIndex + 1 : 1;
+
+  type StatusTone = "asking" | "your-turn" | "reviewing" | "waiting" | "setup";
+  const statusInfo: { badge: string; tone: StatusTone; subtext: string } = !turnState
+    ? { badge: "Setting Up", tone: "setup", subtext: "Setting up the turn order…" }
+    : turnState.phase === "asking"
+      ? isMyTurnToAsk
+        ? {
+            badge: "You're Asking",
+            tone: "your-turn",
+            subtext: `It's your turn to ask ${nicknameFor(askTargetId ?? "")} a question.`,
+          }
+        : askTargetId === currentPlayer.id
+          ? {
+              badge: "You're Up",
+              tone: "your-turn",
+              subtext: `${nicknameFor(askerId ?? "")} is about to ask you a question.`,
+            }
+          : {
+              badge: "Asking",
+              tone: "asking",
+              subtext: `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")}.`,
+            }
+      : turnState.phase === "answering"
+        ? isMyTurnToAnswer
+          ? { badge: "You're Answering", tone: "your-turn", subtext: "Your turn to answer." }
+          : {
+              badge: "Answering",
+              tone: "asking",
+              subtext: `Waiting for ${nicknameFor(responderId ?? "")} to answer.`,
+            }
+        : isReviewingMyTurn
+          ? {
+              badge: "Reviewing",
+              tone: "reviewing",
+              subtext: "All answers are in — review them, then end your turn.",
+            }
+          : {
+              badge: "Reviewing",
+              tone: "waiting",
+              subtext: `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`,
+            };
+
   // ---- Broadcast-derived live activity feed (SPEC.md §9) -----------------
   function describeTurnEvent(event: WhoAmITurnEvent): string {
     const name = nicknameFor(event.playerId);
@@ -930,121 +997,192 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
 
   return (
     <div className="who-am-i-shell">
-      <header className="who-am-i-appbar">
-        <div className="who-am-i-appbar-title">
-          <h2>Reverse Guess Who?</h2>
-          <p className="muted">Ask yes or no questions to figure out which character you are.</p>
+      <header className="who-am-i-topbar">
+        <div className="who-am-i-topbar-left">
+          <AvatarIcon
+            mushroomIndex={currentPlayer.mushroom_index}
+            accessoryIndex={currentPlayer.accessory_index}
+            size={48}
+            wiggle={false}
+          />
+          <div className="who-am-i-topbar-left-info">
+            <span className="who-am-i-round-label">
+              Round {currentRound} of {totalRounds}
+            </span>
+            <span className={`who-am-i-status-badge who-am-i-status-badge-${statusInfo.tone}`}>
+              {statusInfo.badge}
+            </span>
+            {/* aria-live so screen reader users hear whose turn it is
+                without needing to re-focus anything (SPEC.md §11: "aria
+                labels on ... turn indicators"). */}
+            <p className="who-am-i-topbar-subtext" role="status" aria-live="polite">
+              {statusInfo.subtext}
+            </p>
+          </div>
         </div>
 
-        <div className="who-am-i-appbar-status">
-          {!turnState ? (
-            <p className="muted">Setting up the turn order…</p>
-          ) : (
-            <>
-              {/* Turn indicator — aria-live so screen reader users hear whose
-                  turn it is without needing to re-focus anything (SPEC.md
-                  §11: "aria labels on ... turn indicators"). */}
-              <p className="who-am-i-turn-indicator" role="status" aria-live="polite">
-                {turnState.phase === "asking" &&
-                  (isMyTurnToAsk
-                    ? `Your turn — ask ${nicknameFor(askTargetId ?? "")} a yes/no question.`
-                    : askTargetId === currentPlayer.id
-                      ? `${nicknameFor(askerId ?? "")} is about to ask you a question.`
-                      : `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")} a question.`)}
-                {turnState.phase === "answering" &&
-                  (isMyTurnToAnswer
-                    ? "Your turn to answer."
-                    : `Waiting for ${nicknameFor(responderId ?? "")} to answer.`)}
-                {turnState.phase === "reviewing" &&
-                  (isReviewingMyTurn
-                    ? "All answers are in — review them, then end your turn."
-                    : `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`)}
-              </p>
-
-              {/* Presence hint (SPEC.md §9) — layered on top of the turn
-                  indicator above, never a replacement for it. */}
-              {activeTurnPlayerOffline && (
-                <p className="who-am-i-offline-hint muted" role="status">
-                  {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline — hang tight, they may
-                  be reconnecting.
-                </p>
-              )}
-
-              {/* Typing indicator (SPEC.md §9) — Broadcast-only, never
-                  persisted; see games/who-am-i/realtime/broadcastEvents.ts. */}
-              {turnState.phase === "asking" && !isMyTurnToAsk && askerId && typingPlayerIds.has(askerId) && (
-                <p className="who-am-i-typing-indicator muted" aria-live="polite">
-                  {nicknameFor(askerId)} is typing a question…
-                </p>
-              )}
-
-              {/* Live activity feed (SPEC.md §9) — ephemeral Broadcast
-                  toasts, never persisted. */}
-              {liveEvents.length > 0 && (
-                <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
-                  {liveEvents.map((event) => (
-                    <li key={event.id}>{describeTurnEvent(event)}</li>
-                  ))}
-                </ul>
-              )}
-
-              {isReviewingMyTurn && (
-                <div className="who-am-i-review-cta">
-                  {doneError && (
-                    <p className="field-error" role="alert">
-                      {doneError}
-                    </p>
-                  )}
-                  <button type="button" onClick={submitDone} disabled={endingTurn}>
-                    {endingTurn ? "Ending turn…" : "I'm Done"}
-                  </button>
-                </div>
-              )}
-
-              {hasSolved && (
-                <p className="who-am-i-solved-note">
-                  You solved it! You can still answer everyone else&rsquo;s questions.
-                </p>
-              )}
-
-              {guessResult && (
-                <p
-                  className={`who-am-i-guess-result who-am-i-guess-result-${guessResult}`}
-                  role="status"
-                  aria-live="polite"
+        <div className="who-am-i-topbar-center">
+          <ul className="who-am-i-player-row" role="list">
+            {players.map((player) => {
+              const isYou = player.id === currentPlayer.id;
+              const isActiveTurn = player.id === activeTurnPlayerId;
+              return (
+                <li
+                  key={player.id}
+                  className={`who-am-i-player-chip${isActiveTurn ? " who-am-i-player-chip-active" : ""}`}
                 >
-                  {guessResult === "correct"
-                    ? "Correct! You solved it. 🎉"
-                    : "Not quite — your turn ends."}
-                </p>
-              )}
+                  <AvatarIcon
+                    mushroomIndex={player.mushroom_index}
+                    accessoryIndex={player.accessory_index}
+                    size={40}
+                    wiggle={false}
+                  />
+                  <span className={isYou ? "who-am-i-player-chip-you" : undefined}>
+                    {isYou ? "You" : player.nickname}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
 
-              {currentPlayer.is_host && (
-                <div className="who-am-i-host-controls">
-                  {endGameError && (
-                    <p className="field-error" role="alert">
-                      {endGameError}
-                    </p>
-                  )}
-                  <button type="button" onClick={handleEndGame} disabled={endGameSubmitting}>
-                    {endGameSubmitting ? "Ending…" : "End game (host)"}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+        <div className="who-am-i-topbar-right">
+          <button type="button" className="who-am-i-btn-outline" onClick={() => setHowToPlayOpen(true)}>
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M7.6 7.8a2.4 2.4 0 1 1 3.5 2.14c-.66.36-1.1.86-1.1 1.56v.3"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="10" cy="14.3" r="0.9" fill="currentColor" />
+            </svg>
+            How to Play
+          </button>
+          <button type="button" className="who-am-i-btn-leave" onClick={handleLeaveGame}>
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+              <path
+                d="M8 4H4.75A.75.75 0 0 0 4 4.75v10.5c0 .414.336.75.75.75H8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12.5 13.5 16 10l-3.5-3.5M16 10H8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Leave Game
+          </button>
         </div>
       </header>
 
+      {/* Secondary, only-when-relevant status strip — presence hint, typing
+          indicator, live activity feed, solved note, guess result, and the
+          host's "End Game" control. Layered below the compact top bar
+          rather than crowding it (SPEC.md §9/§11 still want all of this
+          surfaced, just not in the primary header). */}
+      {turnState && (
+        <div className="who-am-i-status-strip">
+          {activeTurnPlayerOffline && (
+            <p className="who-am-i-offline-hint muted" role="status">
+              {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline — hang tight, they may be
+              reconnecting.
+            </p>
+          )}
+
+          {turnState.phase === "asking" && !isMyTurnToAsk && askerId && typingPlayerIds.has(askerId) && (
+            <p className="who-am-i-typing-indicator muted" aria-live="polite">
+              {nicknameFor(askerId)} is typing a question…
+            </p>
+          )}
+
+          {liveEvents.length > 0 && (
+            <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
+              {liveEvents.map((event) => (
+                <li key={event.id}>{describeTurnEvent(event)}</li>
+              ))}
+            </ul>
+          )}
+
+          {hasSolved && (
+            <p className="who-am-i-solved-note">
+              You solved it! You can still answer everyone else&rsquo;s questions.
+            </p>
+          )}
+
+          {guessResult && (
+            <p
+              className={`who-am-i-guess-result who-am-i-guess-result-${guessResult}`}
+              role="status"
+              aria-live="polite"
+            >
+              {guessResult === "correct" ? "Correct! You solved it. 🎉" : "Not quite — your turn ends."}
+            </p>
+          )}
+
+          {currentPlayer.is_host && (
+            <div className="who-am-i-host-controls">
+              {endGameError && (
+                <p className="field-error" role="alert">
+                  {endGameError}
+                </p>
+              )}
+              <button type="button" onClick={handleEndGame} disabled={endGameSubmitting}>
+                {endGameSubmitting ? "Ending…" : "End game (host)"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {howToPlayOpen && (
+        <div
+          className="who-am-i-modal-backdrop"
+          role="presentation"
+          onClick={() => setHowToPlayOpen(false)}
+        >
+          <div
+            className="who-am-i-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="who-am-i-howtoplay-heading"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="who-am-i-howtoplay-heading">How to Play</h2>
+            <p>{gameConfig?.description ?? "Ask yes/no questions to figure out who you are."}</p>
+            <ul>
+              <li>Everyone else can see the character card you were secretly assigned — only you can&rsquo;t.</li>
+              <li>On your turn, ask each other player one yes/no question to narrow it down.</li>
+              <li>Tap a card on your deck to cross it off once you&rsquo;ve ruled it out.</li>
+              <li>Think you know who you are? Use &ldquo;I know who I am!&rdquo; and tap your guess.</li>
+            </ul>
+            <button type="button" onClick={() => setHowToPlayOpen(false)}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="who-am-i-layout">
-        {/* ---- Left sidebar: one conversation per player (SPEC.md restructure) ---- */}
+        {/* ---- Left sidebar: collapsed to just an avatar-icon rail, one per
+              conversation (player), to save space — full name/question-count/
+              status now live in the chat panel header instead once a
+              conversation is selected. ---- */}
         <nav className="who-am-i-sidebar" aria-label="Conversations">
           {otherPlayersCount === 0 ? (
-            <p className="muted who-am-i-sidebar-empty">No one else here yet.</p>
+            <p className="muted who-am-i-sidebar-empty" aria-hidden="true">
+              —
+            </p>
           ) : (
             <ul className="who-am-i-conversation-list" role="list">
               {otherPlayers.map((player) => {
-                const convo = conversationsByPlayer.get(player.id) ?? [];
                 const status = conversationStatus(player.id);
                 const isSelected = player.id === selectedPlayerId;
                 return (
@@ -1054,6 +1192,8 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                       className={`who-am-i-conversation-item${isSelected ? " selected" : ""}`}
                       onClick={() => setSelectedPlayerId(player.id)}
                       aria-current={isSelected}
+                      aria-label={`${player.nickname} — ${status.label}`}
+                      title={player.nickname}
                     >
                       <AvatarIcon
                         mushroomIndex={player.mushroom_index}
@@ -1061,15 +1201,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                         size={44}
                         wiggle={false}
                       />
-                      <span className="who-am-i-conversation-item-body">
-                        <span className="who-am-i-conversation-item-name">{player.nickname}</span>
-                        <span className="who-am-i-conversation-item-meta muted">
-                          {convo.length} question{convo.length === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                      <span className={`who-am-i-conversation-status who-am-i-status-${status.tone}`}>
-                        {status.label}
-                      </span>
+                      <span
+                        className={`who-am-i-conversation-status-dot who-am-i-status-${status.tone}`}
+                        aria-hidden="true"
+                      />
                     </button>
                   </li>
                 );
@@ -1093,21 +1228,10 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                 />
                 <div className="who-am-i-chat-header-body">
                   <span className="who-am-i-chat-header-name">{selectedPlayer.nickname}</span>
-                  <span className="muted">{selectedConversation.length} questions asked</span>
+                  <span className="muted">
+                    {selectedConversation.length} question{selectedConversation.length === 1 ? "" : "s"} asked
+                  </span>
                 </div>
-                {(() => {
-                  const characterId = opponentCharacterByPlayer.get(selectedPlayer.id) ?? null;
-                  const character = characterId ? characters.find((c) => c.id === characterId) : undefined;
-                  if (!character) return null;
-                  return (
-                    <span className="who-am-i-chat-header-character" title={`${selectedPlayer.nickname}'s character`}>
-                      <span className="who-am-i-chat-header-character-image">
-                        <Image src={character.image_url} alt="" fill sizes="40px" />
-                      </span>
-                      {character.name}
-                    </span>
-                  );
-                })()}
               </div>
 
               <div className="who-am-i-chat-messages">
@@ -1336,6 +1460,22 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
               })}
             </ul>
           </div>
+
+          {/* "I'm Done" now lives below the table, centered, instead of up
+              in the top bar — it's the natural next action once you've
+              reviewed the board (SPEC.md §8 "Turn Loop" reviewing phase). */}
+          {isReviewingMyTurn && (
+            <div className="who-am-i-done-cta">
+              {doneError && (
+                <p className="field-error" role="alert">
+                  {doneError}
+                </p>
+              )}
+              <button type="button" onClick={submitDone} disabled={endingTurn}>
+                {endingTurn ? "Ending turn…" : "I'm Done"}
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </div>

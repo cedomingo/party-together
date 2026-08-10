@@ -364,43 +364,56 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
 
   // Known member: show the lobby / in-progress view.
   if (currentPlayer) {
+    // Once a game is in progress (or finished), that game's own room-view
+    // component owns the full page presentation — including its own header
+    // and player roster (e.g. WhoAmIRoomView's top bar with the round/turn
+    // status and the player-avatar row) — so platform core's generic
+    // "Who Am I?" title + room-code/copy-link header and the flat
+    // Players (N) list only render during the lobby, before a GameRoomView
+    // exists to take over.
+    const isLobby = room.status === "lobby";
+
     return (
       <main className="page" id="main-content">
-        <header className="room-header">
-          <div>
-            <h1>{gameConfig?.displayName ?? room.game_id}</h1>
-            <p className="room-code">
-              Room code: <strong>{room.code}</strong>
-            </p>
-          </div>
-          <button type="button" onClick={handleCopyLink} aria-live="polite">
-            {copyLabel}
-          </button>
-        </header>
+        {isLobby && (
+          <>
+            <header className="room-header">
+              <div>
+                <h1>{gameConfig?.displayName ?? room.game_id}</h1>
+                <p className="room-code">
+                  Room code: <strong>{room.code}</strong>
+                </p>
+              </div>
+              <button type="button" onClick={handleCopyLink} aria-live="polite">
+                {copyLabel}
+              </button>
+            </header>
 
-        <section aria-labelledby="players-heading">
-          <h2 id="players-heading">Players ({players.length})</h2>
-          <ul className="player-list">
-            {players.map((p) => (
-              <li key={p.id} className="player-row">
-                <AvatarIcon
-                  mushroomIndex={p.mushroom_index}
-                  accessoryIndex={p.accessory_index}
-                  size={36}
-                  wiggle={false}
-                />
-                <span
-                  className={`status-dot ${onlineIds.has(p.id) || p.connected ? "online" : "offline"}`}
-                  aria-hidden="true"
-                />
-                <span>{p.nickname}</span>
-                {p.is_host && <span className="badge">Host</span>}
-                {p.id === currentPlayer.id && <span className="muted">(you)</span>}
-                {!p.connected && !onlineIds.has(p.id) && <span className="muted">disconnected</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
+            <section aria-labelledby="players-heading">
+              <h2 id="players-heading">Players ({players.length})</h2>
+              <ul className="player-list">
+                {players.map((p) => (
+                  <li key={p.id} className="player-row">
+                    <AvatarIcon
+                      mushroomIndex={p.mushroom_index}
+                      accessoryIndex={p.accessory_index}
+                      size={36}
+                      wiggle={false}
+                    />
+                    <span
+                      className={`status-dot ${onlineIds.has(p.id) || p.connected ? "online" : "offline"}`}
+                      aria-hidden="true"
+                    />
+                    <span>{p.nickname}</span>
+                    {p.is_host && <span className="badge">Host</span>}
+                    {p.id === currentPlayer.id && <span className="muted">(you)</span>}
+                    {!p.connected && !onlineIds.has(p.id) && <span className="muted">disconnected</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </>
+        )}
 
         {room.status === "lobby" && (
           <section>
