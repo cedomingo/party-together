@@ -715,22 +715,401 @@ button:disabled {
   font-family: var(--font-display);
 }
 
-/* "Who Am I?" — Setup & Board phase (SPEC.md §8 "Setup"). */
-.who-am-i-board {
-  margin-top: 0.5rem;
+/* ===========================================================================
+   "Who Am I?" — messaging-app restructure: a full-bleed 3-column layout
+   (conversation sidebar / chat panel / character deck) instead of stacked
+   sections. Breaks out of `.page`'s 720px cap via the classic negative-
+   margin full-bleed trick, so the columns get real room on a laptop/tablet
+   without RoomClient (platform core) needing to know this game exists or
+   change its own layout for every other game.
+   =========================================================================== */
+
+.who-am-i-shell {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 1.25rem 1.5rem;
+  box-sizing: border-box;
 }
 
-.who-am-i-board h2 {
-  margin: 0 0 0.35rem;
+.who-am-i-appbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1180px;
+  margin: 0 auto 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 2px dashed var(--ink-18);
+}
+
+.who-am-i-appbar-title h2 {
+  margin: 0 0 0.15rem;
+}
+
+.who-am-i-appbar-title p {
+  margin: 0;
+}
+
+.who-am-i-appbar-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 240px;
+  max-width: 420px;
+  text-align: left;
+}
+
+.who-am-i-review-cta button,
+.who-am-i-host-controls button {
+  align-self: flex-start;
+}
+
+.who-am-i-layout {
+  display: grid;
+  grid-template-columns: 220px 340px 1fr;
+  grid-template-areas: "sidebar chat deck";
+  gap: 1rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+/* ---- Sidebar: one "conversation" per player -------------------------- */
+.who-am-i-sidebar {
+  grid-area: sidebar;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-flat-sm);
+  padding: 0.6rem;
+  max-height: 640px;
+  overflow-y: auto;
+}
+
+.who-am-i-sidebar-empty {
+  padding: 0.5rem;
+}
+
+.who-am-i-conversation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.who-am-i-conversation-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: inherit;
+}
+
+.who-am-i-conversation-item:hover {
+  background: var(--cream);
+}
+
+.who-am-i-conversation-item.selected {
+  background: var(--cream);
+  border-color: var(--border);
+  box-shadow: var(--shadow-flat-sm);
+}
+
+.who-am-i-conversation-item-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.who-am-i-conversation-item-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.who-am-i-conversation-item-meta {
+  font-size: 0.75rem;
+}
+
+.who-am-i-conversation-status {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink-18);
+  color: var(--ink-70);
+}
+
+.who-am-i-status-asking {
+  background: var(--mustard);
+  color: var(--ink);
+}
+
+.who-am-i-status-your-turn {
+  background: var(--coral);
+  color: var(--cream);
+}
+
+/* ---- Chat panel: full history with the selected player ---------------- */
+.who-am-i-chat-panel {
+  grid-area: chat;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-flat-sm);
+  min-height: 420px;
+  max-height: 640px;
+  overflow: hidden;
+}
+
+.who-am-i-chat-empty {
+  padding: 1.25rem;
+}
+
+.who-am-i-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 2px solid var(--ink-18);
+  flex-wrap: wrap;
+}
+
+.who-am-i-chat-header-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.who-am-i-chat-header-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.who-am-i-chat-header-character {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-70);
+  background: var(--cream);
+  border: 2px solid var(--ink-18);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.6rem 0.15rem 0.15rem;
+}
+
+.who-am-i-chat-header-character-image {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.who-am-i-chat-header-character-image img {
+  object-fit: cover;
+}
+
+.who-am-i-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  scrollbar-color: var(--secondary) var(--cream);
+  scrollbar-width: thin;
+}
+
+.who-am-i-chat-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.who-am-i-message {
+  max-width: 88%;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+}
+
+.who-am-i-message p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.who-am-i-message-sender {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-45);
+  margin-bottom: 0.1rem;
+}
+
+.who-am-i-message-you {
+  align-self: flex-end;
+  background: var(--mustard);
+  border-color: var(--mustard);
+}
+
+.who-am-i-message-them {
+  align-self: flex-start;
+  background: var(--cream);
+}
+
+.who-am-i-message-yes {
+  background: color-mix(in srgb, var(--online) 18%, var(--cream));
+  border-color: var(--online);
+}
+
+.who-am-i-message-no {
+  background: color-mix(in srgb, var(--danger) 16%, var(--cream));
+  border-color: var(--danger);
+}
+
+.who-am-i-chat-pending {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.who-am-i-chat-composer {
+  border-top: 2px solid var(--ink-18);
+  padding: 0.65rem 0.8rem;
+}
+
+.who-am-i-chat-composer-disabled {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.who-am-i-ask-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.who-am-i-ask-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.who-am-i-chat-composer-error {
+  width: 100%;
+  margin: 0.4rem 0 0;
+}
+
+.who-am-i-answering-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.who-am-i-answering-prompt {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* ---- Main content: My Deck — the primary visual focus ------------------ */
+.who-am-i-deck {
+  grid-area: deck;
+  min-width: 0;
+}
+
+.who-am-i-deck-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.who-am-i-deck-header h2 {
+  margin: 0 0 0.2rem;
+}
+
+.who-am-i-deck-header p {
+  margin: 0;
+}
+
+.who-am-i-deck-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.who-am-i-deck-counter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 0.35rem 0.85rem;
+  white-space: nowrap;
+}
+
+.who-am-i-guess-toggle {
+  background: var(--special);
+  color: var(--cream);
+}
+
+.who-am-i-guess-toggle.active {
+  background: var(--danger);
+}
+
+.who-am-i-guess-hint {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+  color: var(--special);
+}
+
+/* The blueboard art asset as the deck's background, like the reference
+   physical Guess Who board — the grid of cards sits on top of it. */
+.who-am-i-deck-board {
+  background-image: url("/characters/components/blueboard.png");
+  background-size: cover;
+  background-position: center;
+  border: 3px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-flat);
+  padding: 1.25rem;
 }
 
 .who-am-i-grid {
   list-style: none;
-  margin: 1rem 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 0.85rem;
 }
 
 .who-am-i-card {
@@ -745,6 +1124,7 @@ button:disabled {
   border: 2px solid var(--border);
   color: inherit;
   text-align: center;
+  box-shadow: var(--shadow-flat-sm);
 }
 
 .who-am-i-card-image {
@@ -794,105 +1174,22 @@ button:disabled {
   outline-offset: 2px;
 }
 
-/* "Who Am I?" — Players panel: everyone else's live character card
-   (SPEC.md §7 — "each player is secretly assigned a character identity
-   that only *other* players can see"). Deliberately reuses the same
-   card-image treatment as `.who-am-i-card` / `.who-am-i-recap-image` so
-   an opponent's revealed card and your own hidden elimination-board tile
-   read as the same visual language. */
-.who-am-i-players {
-  margin-top: 1.5rem;
-}
-
-.who-am-i-players h2 {
-  margin: 0 0 0.35rem;
-}
-
-.who-am-i-players-grid {
-  list-style: none;
-  margin: 1rem 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 0.65rem;
-}
-
-.who-am-i-player-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  text-align: center;
-  padding: 0.5rem;
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.who-am-i-player-card-image {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--cream);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.who-am-i-player-card-image img {
-  object-fit: cover;
-}
-
-.who-am-i-player-card-hidden {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--ink-45);
-}
-
-.who-am-i-player-card-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.who-am-i-player-card-character {
-  font-size: 0.75rem;
-  line-height: 1.2;
-  color: var(--ink-70);
-  word-break: break-word;
-}
-
-/* "Who Am I?" — Turn Loop & Question Log (SPEC.md §8 "Turn Loop", §5
-   questions_log). */
-.who-am-i-turn {
-  margin-top: 1.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 2px dashed var(--ink-18);
-}
-
-.who-am-i-turn h2 {
-  margin: 0 0 0.35rem;
-}
-
+/* "Who Am I?" — turn indicator / presence / typing / live feed, now living
+   in the appbar's status column instead of a full-width "Turn" section. */
 .who-am-i-turn-indicator {
   font-family: var(--font-display);
   font-weight: 700;
-  margin: 0 0 0.75rem;
+  margin: 0;
 }
 
-.who-am-i-offline-hint {
-  margin: -0.4rem 0 0.75rem;
+.who-am-i-offline-hint,
+.who-am-i-typing-indicator {
+  margin: 0;
   color: var(--ink-70);
 }
 
 .who-am-i-typing-indicator {
-  margin: -0.4rem 0 0.75rem;
   font-style: italic;
-  color: var(--ink-70);
 }
 
 .who-am-i-typing-indicator::before {
@@ -918,7 +1215,7 @@ button:disabled {
 
 .who-am-i-live-feed {
   list-style: none;
-  margin: 0 0 0.9rem;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -927,96 +1224,11 @@ button:disabled {
   color: var(--ink-70);
 }
 
-.who-am-i-ask-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin: 0 0 1rem;
-}
-
-.who-am-i-active-question {
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
-  margin: 0 0 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.who-am-i-active-question p {
-  margin: 0;
-}
-
 .who-am-i-answer-buttons {
   display: flex;
   gap: 0.6rem;
 }
 
-.who-am-i-answer-summary {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.9rem;
-}
-
-.who-am-i-log {
-  margin-top: 1rem;
-}
-
-.who-am-i-log h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-
-.who-am-i-log-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 280px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  scrollbar-color: var(--secondary) var(--cream);
-  scrollbar-width: thin;
-}
-
-.who-am-i-log-entry {
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 0.8rem;
-}
-
-.who-am-i-log-question {
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.who-am-i-log-answers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 0.75rem;
-  font-size: 0.85rem;
-  color: var(--ink-70);
-}
-
-/* Guess attempts get a lavender-dashed outline instead of the default
-   ink-dashed one, so they read as visually distinct from a plain
-   yes/no/other question at a glance in the shared log list. */
-.who-am-i-log-entry-guess {
-  border-style: dashed;
-  border-color: var(--special);
-}
 
 /* "Who Am I?" — Yes/No/Other answer control (SPEC.md §8 point 3 — a
    responder isn't always limited to a strict yes/no). */
@@ -1211,6 +1423,89 @@ button:disabled {
    above). This block tightens up the handful of spots that were tuned
    for a laptop viewport and cramp on a small phone.
    ------------------------------------------------------------------- */
+/* "Who Am I?" responsive layout — the deck stays the primary visual focus
+   at every width (SPEC.md restructure request); the sidebar/chat columns
+   fold up around it instead of the other way around. */
+@media (max-width: 980px) {
+  .who-am-i-layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "deck deck"
+      "sidebar chat";
+  }
+
+  .who-am-i-sidebar,
+  .who-am-i-chat-panel {
+    max-height: 380px;
+  }
+}
+
+@media (max-width: 640px) {
+  .who-am-i-shell {
+    padding: 0 0.85rem 1.5rem;
+  }
+
+  .who-am-i-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "deck"
+      "sidebar"
+      "chat";
+    gap: 0.75rem;
+  }
+
+  .who-am-i-appbar {
+    flex-direction: column;
+  }
+
+  .who-am-i-appbar-status {
+    max-width: none;
+    width: 100%;
+  }
+
+  /* The sidebar becomes a horizontally-scrollable strip of conversation
+     chips above the chat panel, rather than a tall vertical list, so it
+     doesn't push the deck (the main focus) further down the page. */
+  .who-am-i-sidebar {
+    max-height: none;
+    overflow: visible;
+    padding: 0.5rem;
+  }
+
+  .who-am-i-conversation-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+
+  .who-am-i-conversation-item {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    width: 86px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .who-am-i-conversation-item-body {
+    align-items: center;
+  }
+
+  .who-am-i-conversation-item-name {
+    font-size: 0.7rem;
+    white-space: normal;
+  }
+
+  .who-am-i-conversation-status {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .who-am-i-chat-panel {
+    max-height: 420px;
+  }
+}
+
 @media (max-width: 480px) {
   .page {
     padding: 1.25rem 0.85rem 3rem;

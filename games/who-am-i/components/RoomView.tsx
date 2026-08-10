@@ -57,6 +57,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { AvatarIcon } from "@/app/components/AvatarIcon";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { GameRoomViewProps } from "@/lib/games-registry";
 import {
@@ -178,12 +179,17 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   const [endingTurn, setEndingTurn] = useState(false);
 
   // ---- guess / game-end (SPEC.md §8 points 6-7) --------------------------
-  const [guessCharacterId, setGuessCharacterId] = useState("");
   const [guessSubmitting, setGuessSubmitting] = useState(false);
   const [guessError, setGuessError] = useState<string | null>(null);
   const [guessResult, setGuessResult] = useState<"correct" | "incorrect" | null>(null);
   const [endGameSubmitting, setEndGameSubmitting] = useState(false);
   const [endGameError, setEndGameError] = useState<string | null>(null);
+
+  // ---- messaging-app-style UI: which conversation is open, and whether
+  // the deck is currently in "tap a card to guess" mode (replaces the old
+  // guess <select> — SPEC.md restructure request) --------------------------
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [guessMode, setGuessMode] = useState(false);
 
   // ---- recap (SPEC.md §8 point 7) ----------------------------------------
   // Set from `game_sessions.ended_at`, either on initial load or via the
@@ -628,52 +634,6 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     }
   }
 
-  // ---- guess your identity (SPEC.md §8 point 6) --------------------------
-  // Hits guess/route.ts, which enforces the same "asking" or "reviewing"
-  // phase + current-asker ownership rules as `submitGuess`
-  // (games/who-am-i/logic/turnState.ts) — this handler doesn't duplicate
-  // that check, it just applies whatever `state` comes back so a rejected
-  // guess (409/403) surfaces as `guessError` instead of silently no-op'ing.
-  async function submitGuessAttempt(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!sessionId || !guessCharacterId) return;
-    setGuessSubmitting(true);
-    setGuessError(null);
-    setGuessResult(null);
-    try {
-      const response = await fetch("/api/games/who-am-i/guess", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, characterId: guessCharacterId }),
-      });
-      const payload = await response.json().catch(
-        () => ({}) as { error?: string; state?: unknown; correct?: boolean; gameEnded?: boolean }
-      );
-      if (!response.ok) throw new Error(payload.error ?? "Failed to submit guess.");
-      if (isWhoAmITurnState(payload.state)) {
-        setTurnState(payload.state);
-        broadcastTurnSync(payload.state);
-      }
-      broadcastTurnEvent(payload.correct ? "guess-correct" : "guess-incorrect");
-      setGuessResult(payload.correct ? "correct" : "incorrect");
-      setGuessCharacterId("");
-      // The response already tells us the game ended (a correct guess that
-      // made every player solved — see guess/route.ts) — flip to the
-      // recap immediately rather than waiting on the realtime round-trip.
-      // The exact timestamp doesn't matter to this component; it's only
-      // ever used as a "has the game ended" flag and to key the recap
-      // fetch effect above.
-      if (payload.gameEnded) {
-        setEndedAt(new Date().toISOString());
-        broadcastTurnEvent("game-ended");
-      }
-    } catch (err) {
-      setGuessError(err instanceof Error ? err.message : "Failed to submit guess.");
-    } finally {
-      setGuessSubmitting(false);
-    }
-  }
-
   // ---- host: manually end the game (SPEC.md §8 point 7) ------------------
   // Hits end/route.ts, which enforces host-only server-side — this handler
   // doesn't re-check `currentPlayer.is_host` itself beyond gating whether
@@ -713,20 +673,132 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
     turnState?.activeQuestionId != null
       ? (questions.find((q) => q.id === turnState.activeQuestionId) ?? null)
       : null;
-  // Every question asked THIS turn (one per responder), for the review
-  // screen — see turnState.ts's `turnQuestionIds` doc comment for why a
-  // single `activeQuestion` no longer covers the whole turn.
-  const turnQuestions = useMemo(
-    () =>
-      turnState
-        ? turnState.turnQuestionIds
-            .map((id) => questions.find((q) => q.id === id))
-            .filter((q): q is QuestionLogRow => q != null)
-        : [],
-    [turnState, questions]
-  );
   const hasSolved = turnState?.solvedPlayerIds.includes(currentPlayer.id) ?? false;
   const canGuess = !endedAt && !hasSolved && isMyTurnToAsk && (turnState?.turnQuestionIds.length ?? 0) === 0;
+
+  // ---- messaging-app restructure: one conversation per other player ------
+  // Every OTHER player, in roster order — this is the sidebar's list of
+  // "conversations." (SPEC.md restructure request.)
+  const otherPlayers = useMemo(
+    () => players.filter((p) => p.id !== currentPlayer.id),
+    [players, currentPlayer.id]
+  );
+
+  // This player's full back-and-forth with each other player: every
+  // non-guess question asked by either of them, targeted at the other, in
+  // chronological order. Guesses aren't part of any 1:1 conversation (no
+  // target_player_id), so they're intentionally left out here — the live
+  // activity feed above already surfaces them.
+  const conversationsByPlayer = useMemo(() => {
+    const map = new Map<string, QuestionLogRow[]>();
+    for (const player of otherPlayers) {
+      map.set(
+        player.id,
+        questions.filter(
+          (q) =>
+            !q.is_guess &&
+            ((q.asking_player_id === currentPlayer.id && q.target_player_id === player.id) ||
+              (q.asking_player_id === player.id && q.target_player_id === currentPlayer.id))
+        )
+      );
+    }
+    return map;
+  }, [otherPlayers, questions, currentPlayer.id]);
+
+  // Default to the first conversation once the roster is known.
+  useEffect(() => {
+    if (selectedPlayerId) return;
+    if (otherPlayers.length > 0) setSelectedPlayerId(otherPlayers[0]!.id);
+  }, [otherPlayers, selectedPlayerId]);
+
+  // Auto-open/close the relevant conversation as the turn moves: while it's
+  // my turn to ask, open the person I'm asking; while it's my turn to
+  // answer, open whoever's asking me. The deck (main area) never gets
+  // replaced by this — it's a separate column, always visible (SPEC.md
+  // restructure request: "make sure their card is still being shown").
+  useEffect(() => {
+    if (isMyTurnToAsk && askTargetId) {
+      setSelectedPlayerId(askTargetId);
+    } else if (isMyTurnToAnswer && askerId) {
+      setSelectedPlayerId(askerId);
+    }
+  }, [isMyTurnToAsk, askTargetId, isMyTurnToAnswer, askerId]);
+
+  type ConversationStatus = "asking" | "your-turn" | "waiting";
+  function conversationStatus(playerId: string): { label: string; tone: ConversationStatus } {
+    if (!turnState) return { label: "Waiting", tone: "waiting" };
+    if (turnState.phase === "asking") {
+      if (isMyTurnToAsk && askTargetId === playerId) return { label: "Asking", tone: "asking" };
+      if (askerId === playerId && askTargetId === currentPlayer.id) {
+        return { label: "Your turn", tone: "your-turn" };
+      }
+    }
+    if (turnState.phase === "answering") {
+      if (askerId === currentPlayer.id && responderId === playerId) {
+        return { label: "Answering", tone: "asking" };
+      }
+      if (askerId === playerId && responderId === currentPlayer.id) {
+        return { label: "Your turn", tone: "your-turn" };
+      }
+    }
+    if (turnState.phase === "reviewing" && askerId === currentPlayer.id) {
+      return { label: "Reviewing", tone: "waiting" };
+    }
+    return { label: "Waiting", tone: "waiting" };
+  }
+
+  const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : undefined;
+  const selectedConversation = selectedPlayerId ? (conversationsByPlayer.get(selectedPlayerId) ?? []) : [];
+  // True when the selected conversation is the one live question I can
+  // currently ask (drives whether the chat composer shows a text input).
+  const canAskInSelectedChat = isMyTurnToAsk && askTargetId === selectedPlayerId;
+  // True when the selected conversation is the person currently asking ME
+  // (drives whether the chat composer shows Yes/No/Other buttons instead).
+  const canAnswerInSelectedChat = isMyTurnToAnswer && askerId === selectedPlayerId && !!activeQuestion;
+
+  // Tapping a still-live card while `guessMode` is on submits a guess for
+  // that character directly — replaces the old <select> dropdown, and only
+  // ever offers characters that haven't already been crossed off (SPEC.md
+  // restructure request).
+  async function submitGuessForCharacter(characterId: string) {
+    if (!sessionId) return;
+    const character = characters.find((c) => c.id === characterId);
+    if (
+      character &&
+      !window.confirm(`Guess "${character.name}"? A wrong guess ends your turn.`)
+    ) {
+      return;
+    }
+    setGuessSubmitting(true);
+    setGuessError(null);
+    setGuessResult(null);
+    try {
+      const response = await fetch("/api/games/who-am-i/guess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, characterId }),
+      });
+      const payload = await response.json().catch(
+        () => ({}) as { error?: string; state?: unknown; correct?: boolean; gameEnded?: boolean }
+      );
+      if (!response.ok) throw new Error(payload.error ?? "Failed to submit guess.");
+      if (isWhoAmITurnState(payload.state)) {
+        setTurnState(payload.state);
+        broadcastTurnSync(payload.state);
+      }
+      broadcastTurnEvent(payload.correct ? "guess-correct" : "guess-incorrect");
+      setGuessResult(payload.correct ? "correct" : "incorrect");
+      setGuessMode(false);
+      if (payload.gameEnded) {
+        setEndedAt(new Date().toISOString());
+        broadcastTurnEvent("game-ended");
+      }
+    } catch (err) {
+      setGuessError(err instanceof Error ? err.message : "Failed to submit guess.");
+    } finally {
+      setGuessSubmitting(false);
+    }
+  }
 
   // ---- presence-derived hint (SPEC.md §9 Presence) -----------------------
   // Whoever the turn indicator is currently waiting on — the asker while
@@ -854,111 +926,85 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
   }
 
   const remaining = characters.length - crossedOff.size;
+  const otherPlayersCount = otherPlayers.length;
 
   return (
-    <>
-      <section aria-labelledby="who-am-i-turn-heading" className="who-am-i-turn">
-        <h2 id="who-am-i-turn-heading">Turn</h2>
+    <div className="who-am-i-shell">
+      <header className="who-am-i-appbar">
+        <div className="who-am-i-appbar-title">
+          <h2>Reverse Guess Who?</h2>
+          <p className="muted">Ask yes or no questions to figure out which character you are.</p>
+        </div>
 
-        {!turnState ? (
-          <p className="muted">Setting up the turn order…</p>
-        ) : (
-          <>
-            {/* Turn indicator — aria-live so screen reader users hear whose
-                turn it is without needing to re-focus anything (SPEC.md
-                §11: "aria labels on ... turn indicators"). */}
-            <p className="who-am-i-turn-indicator" role="status" aria-live="polite">
-              {turnState.phase === "asking" &&
-                (isMyTurnToAsk
-                  ? `Your turn — ask ${nicknameFor(askTargetId ?? "")} a yes/no question.`
-                  : askTargetId === currentPlayer.id
-                    ? `${nicknameFor(askerId ?? "")} is about to ask you a question.`
-                    : `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")} a question.`)}
-              {turnState.phase === "answering" &&
-                (isMyTurnToAnswer
-                  ? "Your turn to answer."
-                  : `Waiting for ${nicknameFor(responderId ?? "")} to answer.`)}
-              {turnState.phase === "reviewing" &&
-                (isReviewingMyTurn
-                  ? "All answers are in — review them, update your board, then end your turn."
-                  : `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`)}
-            </p>
-
-            {/* Presence hint (SPEC.md §9) — layered on top of the turn
-                indicator above, never a replacement for it: the turn
-                itself is still driven entirely by Postgres-backed
-                `turnState`, this just explains a stall if it happens. */}
-            {activeTurnPlayerOffline && (
-              <p className="who-am-i-offline-hint muted" role="status">
-                {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline right now — hang tight,
-                they may be reconnecting.
+        <div className="who-am-i-appbar-status">
+          {!turnState ? (
+            <p className="muted">Setting up the turn order…</p>
+          ) : (
+            <>
+              {/* Turn indicator — aria-live so screen reader users hear whose
+                  turn it is without needing to re-focus anything (SPEC.md
+                  §11: "aria labels on ... turn indicators"). */}
+              <p className="who-am-i-turn-indicator" role="status" aria-live="polite">
+                {turnState.phase === "asking" &&
+                  (isMyTurnToAsk
+                    ? `Your turn — ask ${nicknameFor(askTargetId ?? "")} a yes/no question.`
+                    : askTargetId === currentPlayer.id
+                      ? `${nicknameFor(askerId ?? "")} is about to ask you a question.`
+                      : `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")} a question.`)}
+                {turnState.phase === "answering" &&
+                  (isMyTurnToAnswer
+                    ? "Your turn to answer."
+                    : `Waiting for ${nicknameFor(responderId ?? "")} to answer.`)}
+                {turnState.phase === "reviewing" &&
+                  (isReviewingMyTurn
+                    ? "All answers are in — review them, then end your turn."
+                    : `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`)}
               </p>
-            )}
 
-            {/* Typing indicator (SPEC.md §9) — Broadcast-only, never
-                persisted; see games/who-am-i/realtime/broadcastEvents.ts. */}
-            {turnState.phase === "asking" && !isMyTurnToAsk && askerId && typingPlayerIds.has(askerId) && (
-              <p className="who-am-i-typing-indicator muted" aria-live="polite">
-                {nicknameFor(askerId)} is typing a question…
-              </p>
-            )}
+              {/* Presence hint (SPEC.md §9) — layered on top of the turn
+                  indicator above, never a replacement for it. */}
+              {activeTurnPlayerOffline && (
+                <p className="who-am-i-offline-hint muted" role="status">
+                  {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline — hang tight, they may
+                  be reconnecting.
+                </p>
+              )}
 
-            {/* Live activity feed (SPEC.md §9 "I'm Done events" + friends)
-                — ephemeral Broadcast toasts, not the permanent question
-                log below. A refresh never restores this list, by design;
-                see the file header. */}
-            {liveEvents.length > 0 && (
-              <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
-                {liveEvents.map((event) => (
-                  <li key={event.id}>{describeTurnEvent(event)}</li>
-                ))}
-              </ul>
-            )}
+              {/* Typing indicator (SPEC.md §9) — Broadcast-only, never
+                  persisted; see games/who-am-i/realtime/broadcastEvents.ts. */}
+              {turnState.phase === "asking" && !isMyTurnToAsk && askerId && typingPlayerIds.has(askerId) && (
+                <p className="who-am-i-typing-indicator muted" aria-live="polite">
+                  {nicknameFor(askerId)} is typing a question…
+                </p>
+              )}
 
-            {/* Guess-your-identity (SPEC.md §8 point 6) — available ONLY
-                before you've asked your question this turn ("asking"
-                phase), any time you haven't already solved it. It's
-                instead-of asking, not in addition to it: once you've
-                submitted a question and moved into "reviewing", the guess
-                option is gone for the rest of this turn — see
-                `canGuess` and turnState.ts's `submitGuess` doc comment.
-                Host end-game control sits alongside it since both are
-                "leave the normal turn flow" actions. */}
-            <div className="who-am-i-guess-panel">
+              {/* Live activity feed (SPEC.md §9) — ephemeral Broadcast
+                  toasts, never persisted. */}
+              {liveEvents.length > 0 && (
+                <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
+                  {liveEvents.map((event) => (
+                    <li key={event.id}>{describeTurnEvent(event)}</li>
+                  ))}
+                </ul>
+              )}
+
+              {isReviewingMyTurn && (
+                <div className="who-am-i-review-cta">
+                  {doneError && (
+                    <p className="field-error" role="alert">
+                      {doneError}
+                    </p>
+                  )}
+                  <button type="button" onClick={submitDone} disabled={endingTurn}>
+                    {endingTurn ? "Ending turn…" : "I'm Done"}
+                  </button>
+                </div>
+              )}
+
               {hasSolved && (
                 <p className="who-am-i-solved-note">
                   You solved it! You can still answer everyone else&rsquo;s questions.
                 </p>
-              )}
-
-              {canGuess && (
-                <form className="who-am-i-guess-form" onSubmit={submitGuessAttempt}>
-                  <label className="field">
-                    <span>Think you know who you are?</span>
-                    <select
-                      value={guessCharacterId}
-                      onChange={(e) => setGuessCharacterId(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>
-                        Choose a character…
-                      </option>
-                      {characters.map((character) => (
-                        <option key={character.id} value={character.id}>
-                          {character.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {guessError && (
-                    <p className="field-error" role="alert">
-                      {guessError}
-                    </p>
-                  )}
-                  <button type="submit" disabled={guessSubmitting || !guessCharacterId}>
-                    {guessSubmitting ? "Guessing…" : "Guess"}
-                  </button>
-                </form>
               )}
 
               {guessResult && (
@@ -985,73 +1031,184 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                   </button>
                 </div>
               )}
-            </div>
+            </>
+          )}
+        </div>
+      </header>
 
-            {isMyTurnToAsk && askTargetId && (
-              <form className="who-am-i-ask-form" onSubmit={submitQuestion}>
-                <label className="field">
-                  <span>Ask {nicknameFor(askTargetId)} a yes/no question</span>
-                  <input
-                    value={questionDraft}
-                    onChange={(e) => handleQuestionDraftChange(e.target.value)}
-                    maxLength={MAX_QUESTION_LENGTH}
-                    required
-                    placeholder="e.g. Am I a real person?"
-                    autoComplete="off"
-                  />
-                </label>
-                {askError && (
-                  <p className="field-error" role="alert">
-                    {askError}
-                  </p>
+      <div className="who-am-i-layout">
+        {/* ---- Left sidebar: one conversation per player (SPEC.md restructure) ---- */}
+        <nav className="who-am-i-sidebar" aria-label="Conversations">
+          {otherPlayersCount === 0 ? (
+            <p className="muted who-am-i-sidebar-empty">No one else here yet.</p>
+          ) : (
+            <ul className="who-am-i-conversation-list" role="list">
+              {otherPlayers.map((player) => {
+                const convo = conversationsByPlayer.get(player.id) ?? [];
+                const status = conversationStatus(player.id);
+                const isSelected = player.id === selectedPlayerId;
+                return (
+                  <li key={player.id}>
+                    <button
+                      type="button"
+                      className={`who-am-i-conversation-item${isSelected ? " selected" : ""}`}
+                      onClick={() => setSelectedPlayerId(player.id)}
+                      aria-current={isSelected}
+                    >
+                      <AvatarIcon
+                        mushroomIndex={player.mushroom_index}
+                        accessoryIndex={player.accessory_index}
+                        size={44}
+                        wiggle={false}
+                      />
+                      <span className="who-am-i-conversation-item-body">
+                        <span className="who-am-i-conversation-item-name">{player.nickname}</span>
+                        <span className="who-am-i-conversation-item-meta muted">
+                          {convo.length} question{convo.length === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                      <span className={`who-am-i-conversation-status who-am-i-status-${status.tone}`}>
+                        {status.label}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </nav>
+
+        {/* ---- Chat panel: the full history with whoever's selected ---- */}
+        <section className="who-am-i-chat-panel" aria-label="Conversation">
+          {!selectedPlayer ? (
+            <p className="muted who-am-i-chat-empty">Select a player to see your conversation.</p>
+          ) : (
+            <>
+              <div className="who-am-i-chat-header">
+                <AvatarIcon
+                  mushroomIndex={selectedPlayer.mushroom_index}
+                  accessoryIndex={selectedPlayer.accessory_index}
+                  size={40}
+                  wiggle={false}
+                />
+                <div className="who-am-i-chat-header-body">
+                  <span className="who-am-i-chat-header-name">{selectedPlayer.nickname}</span>
+                  <span className="muted">{selectedConversation.length} questions asked</span>
+                </div>
+                {(() => {
+                  const characterId = opponentCharacterByPlayer.get(selectedPlayer.id) ?? null;
+                  const character = characterId ? characters.find((c) => c.id === characterId) : undefined;
+                  if (!character) return null;
+                  return (
+                    <span className="who-am-i-chat-header-character" title={`${selectedPlayer.nickname}'s character`}>
+                      <span className="who-am-i-chat-header-character-image">
+                        <Image src={character.image_url} alt="" fill sizes="40px" />
+                      </span>
+                      {character.name}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              <div className="who-am-i-chat-messages">
+                {selectedConversation.length === 0 && (
+                  <p className="muted who-am-i-chat-empty">No questions yet — this conversation is empty.</p>
                 )}
-                <button type="submit" disabled={asking || questionDraft.trim().length === 0}>
-                  {asking ? "Asking…" : `Ask ${nicknameFor(askTargetId)}`}
-                </button>
-              </form>
-            )}
-
-            {turnState.phase === "answering" && activeQuestion && (
-              <div className="who-am-i-active-question">
-                <p>
-                  <strong>
-                    {nicknameFor(activeQuestion.asking_player_id)} asks
-                    {isMyTurnToAnswer ? " you" : ` ${nicknameFor(responderId ?? "")}`}:
-                  </strong>{" "}
-                  {activeQuestion.question_text}
-                </p>
-                {isMyTurnToAnswer ? (
-                  answerMode === "choose" ? (
-                    <div className="who-am-i-answer-buttons">
-                      <button
-                        type="button"
-                        onClick={() => submitAnswer("yes")}
-                        disabled={answering}
-                        aria-label="Answer yes"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => submitAnswer("no")}
-                        disabled={answering}
-                        aria-label="Answer no"
-                      >
-                        No
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAnswerMode("other")}
-                        disabled={answering}
-                        aria-label="Type a different answer"
-                      >
-                        Other…
-                      </button>
+                {selectedConversation.map((q) => {
+                  const iAsked = q.asking_player_id === currentPlayer.id;
+                  const answer = q.target_player_id ? q.answers[q.target_player_id] : undefined;
+                  return (
+                    <div key={q.id} className="who-am-i-chat-exchange">
+                      <div className={`who-am-i-message ${iAsked ? "who-am-i-message-you" : "who-am-i-message-them"}`}>
+                        <span className="who-am-i-message-sender">
+                          {iAsked ? "You" : selectedPlayer.nickname}
+                        </span>
+                        <p>{q.question_text}</p>
+                      </div>
+                      {answer !== undefined ? (
+                        <div
+                          className={`who-am-i-message ${iAsked ? "who-am-i-message-them" : "who-am-i-message-you"}${
+                            answer === "yes"
+                              ? " who-am-i-message-yes"
+                              : answer === "no"
+                                ? " who-am-i-message-no"
+                                : ""
+                          }`}
+                        >
+                          <span className="who-am-i-message-sender">
+                            {iAsked ? selectedPlayer.nickname : "You"}
+                          </span>
+                          <p>
+                            {formatAnswer(answer)}
+                            {answer === "yes" && " ✓"}
+                            {answer === "no" && " ✕"}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="muted who-am-i-chat-pending">Still being answered…</p>
+                      )}
                     </div>
-                  ) : (
-                    <form className="who-am-i-other-answer-form" onSubmit={submitOtherAnswer}>
-                      <label className="field">
-                        <span>Type your answer</span>
+                  );
+                })}
+              </div>
+
+              <div className="who-am-i-chat-composer">
+                {canAskInSelectedChat && (
+                  <form className="who-am-i-ask-form" onSubmit={submitQuestion}>
+                    <input
+                      value={questionDraft}
+                      onChange={(e) => handleQuestionDraftChange(e.target.value)}
+                      maxLength={MAX_QUESTION_LENGTH}
+                      required
+                      placeholder={`Ask ${selectedPlayer.nickname} a yes/no question…`}
+                      autoComplete="off"
+                      aria-label={`Ask ${selectedPlayer.nickname} a yes/no question`}
+                    />
+                    <button type="submit" disabled={asking || questionDraft.trim().length === 0}>
+                      {asking ? "Asking…" : "Ask"}
+                    </button>
+                    {askError && (
+                      <p className="field-error who-am-i-chat-composer-error" role="alert">
+                        {askError}
+                      </p>
+                    )}
+                  </form>
+                )}
+
+                {canAnswerInSelectedChat && activeQuestion && (
+                  <div className="who-am-i-answering-panel">
+                    <p className="who-am-i-answering-prompt">
+                      <strong>{selectedPlayer.nickname} asks you:</strong> {activeQuestion.question_text}
+                    </p>
+                    {answerMode === "choose" ? (
+                      <div className="who-am-i-answer-buttons">
+                        <button
+                          type="button"
+                          onClick={() => submitAnswer("yes")}
+                          disabled={answering}
+                          aria-label="Answer yes"
+                        >
+                          Yes ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => submitAnswer("no")}
+                          disabled={answering}
+                          aria-label="Answer no"
+                        >
+                          No ✕
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnswerMode("other")}
+                          disabled={answering}
+                          aria-label="Type a different answer"
+                        >
+                          Other…
+                        </button>
+                      </div>
+                    ) : (
+                      <form className="who-am-i-other-answer-form" onSubmit={submitOtherAnswer}>
                         <input
                           value={otherAnswerDraft}
                           onChange={(e) => setOtherAnswerDraft(e.target.value)}
@@ -1060,209 +1217,127 @@ export function WhoAmIRoomView({ room, players, currentPlayer, onlineIds }: Game
                           placeholder="e.g. Kind of, depends…"
                           autoComplete="off"
                           autoFocus
+                          aria-label="Type your answer"
                         />
-                      </label>
-                      <div className="who-am-i-other-answer-actions">
-                        <button type="submit" disabled={answering || otherAnswerDraft.trim().length === 0}>
-                          {answering ? "Sending…" : "Send answer"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAnswerMode("choose");
-                            setOtherAnswerDraft("");
-                          }}
-                          disabled={answering}
-                        >
-                          Back
-                        </button>
-                      </div>
-                    </form>
-                  )
-                ) : (
-                  <p className="muted">Waiting for {nicknameFor(responderId ?? "")} to answer.</p>
+                        <div className="who-am-i-other-answer-actions">
+                          <button type="submit" disabled={answering || otherAnswerDraft.trim().length === 0}>
+                            {answering ? "Sending…" : "Send"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAnswerMode("choose");
+                              setOtherAnswerDraft("");
+                            }}
+                            disabled={answering}
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                    {answerError && (
+                      <p className="field-error" role="alert">
+                        {answerError}
+                      </p>
+                    )}
+                  </div>
                 )}
-                {answerError && (
-                  <p className="field-error" role="alert">
-                    {answerError}
+
+                {!canAskInSelectedChat && !canAnswerInSelectedChat && (
+                  <p className="muted who-am-i-chat-composer-disabled">
+                    {turnState?.phase === "reviewing" && askerId === currentPlayer.id
+                      ? "Review this turn's answers above, then press \u201cI'm Done.\u201d"
+                      : `Waiting for your turn to chat with ${selectedPlayer.nickname}.`}
                   </p>
                 )}
               </div>
-            )}
+            </>
+          )}
+        </section>
 
-            {turnState.phase === "reviewing" && turnQuestions.length > 0 && (
-              <div className="who-am-i-active-question who-am-i-turn-review">
-                <ul className="who-am-i-turn-review-list">
-                  {turnQuestions.map((q) => (
-                    <li key={q.id}>
-                      <p>
-                        <strong>
-                          {nicknameFor(q.asking_player_id)} asked{" "}
-                          {nicknameFor(q.target_player_id ?? "")}:
-                        </strong>{" "}
-                        {q.question_text}
-                      </p>
-                      <ul className="who-am-i-answer-summary">
-                        {Object.entries(q.answers).map(([playerId, answer]) => (
-                          <li key={playerId}>
-                            {nicknameFor(playerId)}: <strong>{formatAnswer(answer)}</strong>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-                {isReviewingMyTurn && (
-                  <>
-                    {doneError && (
-                      <p className="field-error" role="alert">
-                        {doneError}
-                      </p>
-                    )}
-                    <button type="button" onClick={submitDone} disabled={endingTurn}>
-                      {endingTurn ? "Ending turn…" : "I'm Done"}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </>
-        )}
+        {/* ---- Main content: My Deck — the primary visual focus ---- */}
+        <section className="who-am-i-deck" aria-labelledby="who-am-i-deck-heading">
+          <div className="who-am-i-deck-header">
+            <div>
+              <h2 id="who-am-i-deck-heading">My Deck</h2>
+              {state === "no-assignment" ? (
+                <p className="muted">You joined mid-round, so you weren&rsquo;t assigned a character.</p>
+              ) : (
+                <p className="muted">Tap a character to cross it off as you rule it out.</p>
+              )}
+            </div>
+            <div className="who-am-i-deck-header-actions">
+              <span className="who-am-i-deck-counter">
+                {remaining} remaining
+              </span>
+              {canGuess && (
+                <button
+                  type="button"
+                  className={`who-am-i-guess-toggle${guessMode ? " active" : ""}`}
+                  onClick={() => setGuessMode((v) => !v)}
+                  disabled={guessSubmitting}
+                >
+                  {guessMode ? "Cancel guess" : "I know who I am!"}
+                </button>
+              )}
+            </div>
+          </div>
 
-        {questions.length > 0 && (
-          <div className="who-am-i-log">
-            <h3>Question log</h3>
-            <ul className="who-am-i-log-list">
-              {questions.map((q) => {
-                // A guess counts as a question in this log (SPEC.md §8
-                // point 6) — it's rendered as its own kind of entry rather
-                // than a normal ask/answer round, since it's already
-                // resolved the instant it's logged (see guess/route.ts).
-                if (q.is_guess) {
-                  const guessedName = q.guessed_character_id
-                    ? (characters.find((c) => c.id === q.guessed_character_id)?.name ?? "a character")
-                    : "a character";
-                  const wasCorrect = q.answers[q.asking_player_id] === "correct";
+          {guessMode && (
+            <p className="who-am-i-guess-hint" role="status">
+              Tap a card below to guess it — a wrong guess ends your turn.
+            </p>
+          )}
+          {guessError && (
+            <p className="field-error" role="alert">
+              {guessError}
+            </p>
+          )}
+
+          <div className="who-am-i-deck-board">
+            <ul className="who-am-i-grid" role="list">
+              {characters.map((character) => {
+                const isCrossedOff = crossedOff.has(character.id);
+                if (guessMode) {
                   return (
-                    <li key={q.id} className="who-am-i-log-entry who-am-i-log-entry-guess">
-                      <p className="who-am-i-log-question">
-                        <strong>{nicknameFor(q.asking_player_id)}</strong> guessed{" "}
-                        <strong>{guessedName}</strong> —{" "}
-                        <span
-                          className={
-                            wasCorrect
-                              ? "who-am-i-guess-result-correct"
-                              : "who-am-i-guess-result-incorrect"
-                          }
-                        >
-                          {wasCorrect ? "Correct!" : "Incorrect"}
+                    <li key={character.id}>
+                      <button
+                        type="button"
+                        className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
+                        onClick={() => !isCrossedOff && submitGuessForCharacter(character.id)}
+                        disabled={isCrossedOff || guessSubmitting}
+                        aria-label={`Guess ${character.name}`}
+                      >
+                        <span className="who-am-i-card-image">
+                          <Image src={character.image_url} alt="" fill sizes="96px" />
                         </span>
-                      </p>
+                        <span className="who-am-i-card-name">{character.name}</span>
+                      </button>
                     </li>
                   );
                 }
                 return (
-                  <li key={q.id} className="who-am-i-log-entry">
-                    <p className="who-am-i-log-question">
-                      <strong>
-                        {nicknameFor(q.asking_player_id)}
-                        {q.target_player_id ? ` asked ${nicknameFor(q.target_player_id)}` : ""}:
-                      </strong>{" "}
-                      {q.question_text}
-                    </p>
-                    {Object.keys(q.answers).length > 0 && (
-                      <ul className="who-am-i-log-answers">
-                        {Object.entries(q.answers).map(([playerId, answer]) => (
-                          <li key={playerId}>
-                            {nicknameFor(playerId)}: {formatAnswer(answer)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {!q.resolved && <span className="muted">Still being answered…</span>}
+                  <li key={character.id}>
+                    <button
+                      type="button"
+                      className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
+                      onClick={() => toggleCharacter(character.id)}
+                      aria-pressed={isCrossedOff}
+                      aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
+                    >
+                      <span className="who-am-i-card-image">
+                        <Image src={character.image_url} alt="" fill sizes="96px" />
+                      </span>
+                      <span className="who-am-i-card-name">{character.name}</span>
+                    </button>
                   </li>
                 );
               })}
             </ul>
           </div>
-        )}
-      </section>
-
-      <section aria-labelledby="who-am-i-players-heading" className="who-am-i-players">
-        <h2 id="who-am-i-players-heading">Players</h2>
-        <p className="muted">
-          You can see everyone else&rsquo;s secret character — use it to answer their questions.
-          Only your own stays hidden.
-        </p>
-        <ul className="who-am-i-players-grid" role="list">
-          {players.map((player) => {
-            const isYou = player.id === currentPlayer.id;
-            const characterId = opponentCharacterByPlayer.get(player.id) ?? null;
-            const character = characterId ? characters.find((c) => c.id === characterId) : undefined;
-            const hasSolvedTheirs = turnState?.solvedPlayerIds.includes(player.id) ?? false;
-            return (
-              <li key={player.id} className="who-am-i-player-card">
-                <span className="who-am-i-player-card-image">
-                  {character ? (
-                    <Image src={character.image_url} alt="" fill sizes="72px" />
-                  ) : (
-                    <span className="who-am-i-player-card-hidden" aria-hidden="true">
-                      ?
-                    </span>
-                  )}
-                </span>
-                <span className="who-am-i-player-card-name">
-                  {player.nickname}
-                  {isYou ? " (you)" : ""}
-                </span>
-                <span className="who-am-i-player-card-character muted">
-                  {isYou
-                    ? "Hidden from you"
-                    : (character?.name ?? (state === "no-assignment" ? "No character" : "…"))}
-                  {hasSolvedTheirs ? " · Solved!" : ""}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <section aria-labelledby="who-am-i-board-heading" className="who-am-i-board">
-        <h2 id="who-am-i-board-heading">Who Am I?</h2>
-        {state === "no-assignment" ? (
-          <p className="muted">
-            You joined after this round started, so you weren&rsquo;t assigned a character — you can
-            still use the board to help others narrow things down.
-          </p>
-        ) : (
-          <p className="muted">
-            Everyone else can see your secret character — you can&rsquo;t. Tap a character to cross
-            it off as you rule it out. {remaining} of {characters.length} left.
-          </p>
-        )}
-
-        <ul className="who-am-i-grid" role="list">
-          {characters.map((character) => {
-            const isCrossedOff = crossedOff.has(character.id);
-            return (
-              <li key={character.id}>
-                <button
-                  type="button"
-                  className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                  onClick={() => toggleCharacter(character.id)}
-                  aria-pressed={isCrossedOff}
-                  aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
-                >
-                  <span className="who-am-i-card-image">
-                    <Image src={character.image_url} alt="" fill sizes="96px" />
-                  </span>
-                  <span className="who-am-i-card-name">{character.name}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    </>
+        </section>
+      </div>
+    </div>
   );
 }
