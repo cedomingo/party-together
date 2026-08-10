@@ -118,11 +118,14 @@ type GameRoomView = ComponentType<GameRoomViewProps>;
 // game without ever importing /games/** itself.
 import { whoAmIConfig } from "@/games/who-am-i/config";
 import { WhoAmIRoomView } from "@/games/who-am-i/components/RoomView";
+import { whoAreYouConfig } from "@/games/who-are-you/config";
+import { WhoAreYouRoomView } from "@/games/who-are-you/components/RoomView";
 
-export const games: GameConfig[] = [whoAmIConfig];
+export const games: GameConfig[] = [whoAmIConfig, whoAreYouConfig];
 
 const roomViews: Record<string, GameRoomView> = {
   [whoAmIConfig.id]: WhoAmIRoomView,
+  [whoAreYouConfig.id]: WhoAreYouRoomView,
 };
 
 export function getGameConfig(id: string): GameConfig | undefined {

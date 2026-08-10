@@ -1505,6 +1505,67 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* "Who Are You?" character picker (WHO-ARE-YOU-SPEC.md §3) — the
+   selected-but-not-yet-locked-in state on a reused `.who-am-i-card`. Uses
+   --info (the same blue as links/the conversation-open indicator) rather
+   than --danger's crossed-off red, since selecting is a positive/neutral
+   action here, not an elimination. */
+.who-am-i-card.selected {
+  border-color: var(--info);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 35%, transparent);
+}
+
+/* ---- "Who Are You?" — setup/picking phase only (Step 1) ---------------- */
+.who-are-you-shell {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 1.25rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.who-are-you-picker,
+.who-are-you-waiting {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.who-are-you-picked-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 140px;
+  margin: 0.75rem 0;
+}
+
+.who-are-you-picked-card .who-am-i-card-image {
+  width: 100%;
+}
+
+.who-are-you-all-ready {
+  font-weight: 600;
+  color: var(--online);
+}
+
+/* Same visual language as the lobby's `.status-dot`, but tracks "has
+   picked a character" rather than "is currently connected" — kept as its
+   own class rather than reusing `.status-dot`/`.online` so the two
+   meanings can't be confused in markup. */
+.who-are-you-ready-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--offline);
+  flex-shrink: 0;
+}
+
+.who-are-you-ready-dot.ready {
+  background: var(--online);
+}
+
 /* "I'm Done" — centered below the table, once the asker has reviewed the
    turn's answers (moved down from the top bar per design spec). */
 .who-am-i-done-cta {
