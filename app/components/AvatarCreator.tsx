@@ -26,6 +26,16 @@ export interface AvatarCreatorProps {
   onMushroomIndexChange: (index: number) => void;
   accessoryIndex: number;
   onAccessoryIndexChange: (index: number) => void;
+  /**
+   * False until every mushroom/accessory PNG has been preloaded (see
+   * `preloadAvatarAssets` in lib/avatar.ts). While false, the live preview
+   * and the ‹ › cycle buttons are replaced with a loading placeholder
+   * instead of rendering an avatar that might still be mid-download —
+   * that flash-then-pop-in (and the same lag on every subsequent
+   * click) is exactly what this is preventing. Defaults to true so
+   * existing callers that don't care about this keep working unchanged.
+   */
+  assetsReady?: boolean;
 }
 
 function cycle(current: number, length: number, delta: number) {
@@ -39,6 +49,7 @@ export function AvatarCreator({
   onMushroomIndexChange,
   accessoryIndex,
   onAccessoryIndexChange,
+  assetsReady = true,
 }: AvatarCreatorProps) {
   const mushroom = getMushroom(mushroomIndex);
   const accessory = getAccessory(accessoryIndex);
@@ -57,7 +68,16 @@ export function AvatarCreator({
       </label>
 
       <div className="avatar-creator-preview">
-        <AvatarIcon mushroomIndex={mushroomIndex} accessoryIndex={accessoryIndex} size={104} />
+        {assetsReady ? (
+          <AvatarIcon mushroomIndex={mushroomIndex} accessoryIndex={accessoryIndex} size={104} />
+        ) : (
+          <div
+            className="avatar-creator-preview-skeleton"
+            style={{ width: 104, height: 104 }}
+            role="status"
+            aria-label="Loading avatar options"
+          />
+        )}
       </div>
 
       <div className="avatar-picker">
@@ -65,18 +85,20 @@ export function AvatarCreator({
           type="button"
           className="avatar-picker-arrow"
           aria-label={`Previous color (currently ${mushroom.label})`}
+          disabled={!assetsReady}
           onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, -1))}
         >
           ‹
         </button>
         <span className="avatar-picker-value">
-          Color
+          {assetsReady ? "Color" : "Loading…"}
           <span className="sr-only"> ({mushroom.label})</span>
         </span>
         <button
           type="button"
           className="avatar-picker-arrow"
           aria-label={`Next color (currently ${mushroom.label})`}
+          disabled={!assetsReady}
           onClick={() => onMushroomIndexChange(cycle(mushroomIndex, MUSHROOMS.length, 1))}
         >
           ›
@@ -88,18 +110,20 @@ export function AvatarCreator({
           type="button"
           className="avatar-picker-arrow"
           aria-label={`Previous accessory (currently ${accessory.label})`}
+          disabled={!assetsReady}
           onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, -1))}
         >
           ‹
         </button>
         <span className="avatar-picker-value">
-          Accessory
+          {assetsReady ? "Accessory" : "Loading…"}
           <span className="sr-only"> ({accessory.label})</span>
         </span>
         <button
           type="button"
           className="avatar-picker-arrow"
           aria-label={`Next accessory (currently ${accessory.label})`}
+          disabled={!assetsReady}
           onClick={() => onAccessoryIndexChange(cycle(accessoryIndex, ACCESSORIES.length, 1))}
         >
           ›

@@ -401,6 +401,36 @@ button:disabled {
   padding: 0.15rem;
 }
 
+/* Stand-in for the avatar preview while its assets are still being
+   preloaded (see preloadAvatarAssets in lib/avatar.ts) — same circular
+   "stage" shape as .avatar-icon so nothing jumps in size once the real
+   preview swaps in. A slow shimmer instead of a spinner keeps it feeling
+   like part of the cozy paper-cutout style rather than a generic loader. */
+.avatar-creator-preview-skeleton {
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--cream) 25%, var(--paper) 50%, var(--cream) 75%);
+  background-size: 200% 100%;
+  border: 2.5px solid var(--border);
+  box-shadow: inset 0 2px 6px rgba(47, 42, 34, 0.15);
+  animation: avatar-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes avatar-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-creator-preview-skeleton {
+    animation: none;
+  }
+}
+
 /* The composited mushroom + accessory preview. A circular "stage" with a
    soft inset shadow so the paper-cutout art reads as sitting in a little
    dish rather than floating on a hard edge. */

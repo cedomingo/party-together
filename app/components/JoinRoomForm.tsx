@@ -17,11 +17,15 @@ export function JoinRoomForm({
   nickname,
   mushroomIndex,
   accessoryIndex,
+  avatarAssetsReady = true,
 }: {
   fixedCode?: string;
   nickname: string;
   mushroomIndex: number;
   accessoryIndex: number;
+  /** False while avatar images are still preloading — see RoomForms.tsx.
+   * Held true by default so callers that don't preload keep working. */
+  avatarAssetsReady?: boolean;
 }) {
   const router = useRouter();
   const [code, setCode] = useState(fixedCode ?? "");
@@ -69,8 +73,8 @@ export function JoinRoomForm({
         </p>
       )}
 
-      <button type="submit" disabled={loading}>
-        {loading ? "Joining…" : "Join a room"}
+      <button type="submit" disabled={loading || !avatarAssetsReady}>
+        {loading ? "Joining…" : avatarAssetsReady ? "Join a room" : "Loading avatar…"}
       </button>
     </form>
   );

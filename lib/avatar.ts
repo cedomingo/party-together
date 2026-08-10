@@ -115,3 +115,54 @@ export function saveStoredAvatar(avatar: AvatarSelection): void {
     // still works for this visit, it just won't be remembered.
   }
 }
+
+// ---------------------------------------------------------------------
+// Asset preloading — every mushroom/accessory PNG the picker can show
+// needs to already be in the browser's cache *before* the picker (and its
+// Create/Join/Next action) is shown. Without this, cycling the ‹ › arrows
+// or hitting Next fires off a fresh image request for whichever option
+// wasn't cached yet, which is exactly the "delayed avatar" / "delayed
+// click" symptom this is fixing. Callers should render a loading state
+// (skeleton, spinner, etc.) until the returned promise resolves, and only
+// then reveal the avatar creator itself.
+//
+// Deliberately not a React hook (see AvatarCreator's own note on why
+// hooks don't belong in this file — lib/rooms/index.ts imports MUSHROOMS/
+// ACCESSORIES from here on the server, so this module has to stay
+// safe to import outside a client component). Client components call
+// `preloadAvatarAssets()` from their own `useEffect`.
+//
+// Cached at module scope (not per-call) so mounting the avatar creator
+// more than once in a session — home page, then a game landing page, then
+// the in-room "join by link" form — only ever pays the download cost
+// once; every later mount resolves immediately against the same promise
+// (and, after the first run, against the browser's own HTTP cache too).
+// ---------------------------------------------------------------------
+
+let avatarAssetsPromise: Promise<void> | null = null;
+
+export function preloadAvatarAssets(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (avatarAssetsPromise) return avatarAssetsPromise;
+
+  const sources = [
+    ...MUSHROOMS.map((m) => m.src),
+    ...ACCESSORIES.map((a) => a.src).filter((src): src is string => src !== null),
+  ];
+
+  avatarAssetsPromise = Promise.all(
+    sources.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const img = new window.Image();
+          img.onload = () => resolve();
+          // A single slow/broken asset shouldn't block the whole picker
+          // forever — treat a failed load the same as a finished one.
+          img.onerror = () => resolve();
+          img.src = src;
+        })
+    )
+  ).then(() => undefined);
+
+  return avatarAssetsPromise;
+}

@@ -21,12 +21,16 @@ export function CreateRoomForm({
   nickname,
   mushroomIndex,
   accessoryIndex,
+  avatarAssetsReady = true,
 }: {
   games: GameSummary[];
   fixedGameId?: string;
   nickname: string;
   mushroomIndex: number;
   accessoryIndex: number;
+  /** False while avatar images are still preloading — see RoomForms.tsx.
+   * Held true by default so callers that don't preload keep working. */
+  avatarAssetsReady?: boolean;
 }) {
   const router = useRouter();
   const [gameId, setGameId] = useState(fixedGameId ?? games[0]?.id ?? "");
@@ -97,8 +101,8 @@ export function CreateRoomForm({
         </p>
       )}
 
-      <button type="submit" disabled={loading || !gameId}>
-        {loading ? "Creating…" : "Create a room"}
+      <button type="submit" disabled={loading || !gameId || !avatarAssetsReady}>
+        {loading ? "Creating…" : avatarAssetsReady ? "Create a room" : "Loading avatar…"}
       </button>
     </form>
   );

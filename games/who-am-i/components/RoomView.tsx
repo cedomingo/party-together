@@ -560,25 +560,72 @@ export function WhoAmIRoomView({
   // else (and a refreshed page) in sync.
   async function submitQuestion(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!sessionId) return;
+    if (!sessionId || !askTargetId) return;
+    const trimmedText = questionDraft.trim();
+    if (trimmedText.length === 0) return;
+
+    // Optimistic send: the asker shouldn't have to wait on the network
+    // round trip (POST + Postgres write + realtime echo back) to see their
+    // own message land — drop a temp-id row into the log and clear/lock
+    // the composer immediately. `tempId` is swapped for the real row id
+    // once the server responds (below), so the realtime INSERT for this
+    // same row (see the postgres_changes subscription above) is recognized
+    // as the row we already have instead of appended a second time. If the
+    // request fails, the optimistic row is pulled back out and the draft
+    // text is restored so the player can retry without retyping.
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimisticRow: QuestionLogRow = {
+      id: tempId,
+      session_id: sessionId,
+      asking_player_id: currentPlayer.id,
+      target_player_id: askTargetId,
+      question_text: trimmedText,
+      created_at: new Date().toISOString(),
+      answers: {},
+      resolved: false,
+      is_guess: false,
+      guessed_character_id: null,
+    };
+
+    setQuestions((prev) => [...prev, optimisticRow]);
+    setQuestionDraft("");
     setAsking(true);
     setAskError(null);
+    stopTypingSignal();
+
     try {
       const response = await fetch("/api/games/who-am-i/question", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, questionText: questionDraft }),
+        body: JSON.stringify({ sessionId, questionText: trimmedText }),
       });
-      const payload = await response.json().catch(() => ({}) as { error?: string; state?: unknown });
+      const payload = await response
+        .json()
+        .catch(() => ({}) as { error?: string; state?: unknown; questionId?: string });
       if (!response.ok) throw new Error(payload.error ?? "Failed to submit question.");
+
+      const realId = typeof payload.questionId === "string" ? payload.questionId : null;
+      if (realId) {
+        setQuestions((prev) => {
+          // Realtime can beat this response back (INSERT arrives before the
+          // POST resolves) and already appended the authoritative row — in
+          // that case just drop the temp row instead of renaming it into a
+          // duplicate id.
+          if (prev.some((q) => q.id === realId)) {
+            return prev.filter((q) => q.id !== tempId);
+          }
+          return prev.map((q) => (q.id === tempId ? { ...q, id: realId } : q));
+        });
+      }
+
       if (isWhoAmITurnState(payload.state)) {
         setTurnState(payload.state);
         broadcastTurnSync(payload.state);
       }
       broadcastTurnEvent("question-asked");
-      setQuestionDraft("");
-      stopTypingSignal();
     } catch (err) {
+      setQuestions((prev) => prev.filter((q) => q.id !== tempId));
+      setQuestionDraft(trimmedText);
       setAskError(err instanceof Error ? err.message : "Failed to submit question.");
     } finally {
       setAsking(false);

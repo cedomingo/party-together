@@ -32,7 +32,7 @@ import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
 import { StatusScreen } from "@/app/components/StatusScreen";
 import { AvatarCreator } from "@/app/components/AvatarCreator";
 import { AvatarIcon } from "@/app/components/AvatarIcon";
-import { loadStoredAvatar, saveStoredAvatar, type AvatarSelection } from "@/lib/avatar";
+import { loadStoredAvatar, preloadAvatarAssets, saveStoredAvatar, type AvatarSelection } from "@/lib/avatar";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
@@ -60,10 +60,26 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [joinAvatar, setJoinAvatar] = useState<AvatarSelection>(() => loadStoredAvatar());
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
+  // — see the same gating in RoomForms.tsx. Kicked off unconditionally on
+  // mount (not only once the join form is actually reached) so the assets
+  // have as much of a head start as possible against the room lookup this
+  // component is also doing.
+  const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
 
   useEffect(() => {
     saveStoredAvatar(joinAvatar);
   }, [joinAvatar]);
+
+  useEffect(() => {
+    let cancelled = false;
+    preloadAvatarAssets().then(() => {
+      if (!cancelled) setAvatarAssetsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [starting, setStarting] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy invite link");
@@ -527,6 +543,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
         onMushroomIndexChange={(mushroomIndex) => setJoinAvatar((a) => ({ ...a, mushroomIndex }))}
         accessoryIndex={joinAvatar.accessoryIndex}
         onAccessoryIndexChange={(accessoryIndex) => setJoinAvatar((a) => ({ ...a, accessoryIndex }))}
+        assetsReady={avatarAssetsReady}
       />
 
       <form className="panel-form" onSubmit={handleJoinSubmit}>
@@ -535,8 +552,8 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
             {joinError}
           </p>
         )}
-        <button type="submit" disabled={joining || !joinAvatar.name.trim()}>
-          {joining ? "Joining…" : "Join room"}
+        <button type="submit" disabled={joining || !joinAvatar.name.trim() || !avatarAssetsReady}>
+          {joining ? "Joining…" : avatarAssetsReady ? "Join room" : "Loading avatar…"}
         </button>
       </form>
     </main>

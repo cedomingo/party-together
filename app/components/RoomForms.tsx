@@ -11,12 +11,23 @@ import { useEffect, useState } from "react";
 import { AvatarCreator } from "@/app/components/AvatarCreator";
 import { CreateRoomForm } from "@/app/components/CreateRoomForm";
 import { JoinRoomForm } from "@/app/components/JoinRoomForm";
-import { DEFAULT_AVATAR, loadStoredAvatar, saveStoredAvatar, type AvatarSelection } from "@/lib/avatar";
+import {
+  DEFAULT_AVATAR,
+  loadStoredAvatar,
+  preloadAvatarAssets,
+  saveStoredAvatar,
+  type AvatarSelection,
+} from "@/lib/avatar";
 import type { GameSummary } from "@/lib/games-registry";
 
 export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedGameId?: string }) {
   const [avatar, setAvatar] = useState<AvatarSelection>(DEFAULT_AVATAR);
   const [hydrated, setHydrated] = useState(false);
+  // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
+  // — the picker and the Create/Join buttons below both wait on this so a
+  // player never sees their avatar pop in late or clicks Next into an
+  // avatar that hasn't actually finished loading.
+  const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
 
   // Read localStorage after mount only, so SSR markup and the first client
   // render match (avoids a hydration mismatch warning).
@@ -30,6 +41,16 @@ export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedG
     saveStoredAvatar(avatar);
   }, [avatar, hydrated]);
 
+  useEffect(() => {
+    let cancelled = false;
+    preloadAvatarAssets().then(() => {
+      if (!cancelled) setAvatarAssetsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <>
       <AvatarCreator
@@ -39,6 +60,7 @@ export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedG
         onMushroomIndexChange={(mushroomIndex) => setAvatar((a) => ({ ...a, mushroomIndex }))}
         accessoryIndex={avatar.accessoryIndex}
         onAccessoryIndexChange={(accessoryIndex) => setAvatar((a) => ({ ...a, accessoryIndex }))}
+        assetsReady={avatarAssetsReady}
       />
 
       <div className="two-up">
@@ -48,11 +70,13 @@ export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedG
           nickname={avatar.name}
           mushroomIndex={avatar.mushroomIndex}
           accessoryIndex={avatar.accessoryIndex}
+          avatarAssetsReady={avatarAssetsReady}
         />
         <JoinRoomForm
           nickname={avatar.name}
           mushroomIndex={avatar.mushroomIndex}
           accessoryIndex={avatar.accessoryIndex}
+          avatarAssetsReady={avatarAssetsReady}
         />
       </div>
     </>
