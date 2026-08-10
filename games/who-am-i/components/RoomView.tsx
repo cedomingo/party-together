@@ -160,6 +160,23 @@ export function WhoAmIRoomView({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  // ---- in-app confirmation dialog ----------------------------------------
+  // Replaces the browser's native window.confirm() (which surfaces as an
+  // ugly, unstyled "<site> says" tab-chrome prompt) with our own modal,
+  // reusing the same backdrop/modal styling as the "How to Play" dialog
+  // above. `onConfirm` runs and the dialog closes on "Confirm"; "Cancel"/
+  // backdrop-click just closes it without running anything.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const requestConfirm = useCallback(
+    (message: string, onConfirm: () => void, confirmLabel = "Confirm") => {
+      setConfirmDialog({ message, confirmLabel, onConfirm });
+    },
+    []
+  );
 
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -694,9 +711,17 @@ export function WhoAmIRoomView({
   // Hits end/route.ts, which enforces host-only server-side — this handler
   // doesn't re-check `currentPlayer.is_host` itself beyond gating whether
   // the control renders at all (see the render section below).
-  async function handleEndGame() {
+  function handleEndGame() {
     if (!sessionId) return;
-    if (!window.confirm("End the game now for everyone? This can't be undone.")) return;
+    requestConfirm(
+      "End the game now for everyone? This can't be undone.",
+      performEndGame,
+      "End Game"
+    );
+  }
+
+  async function performEndGame() {
+    if (!sessionId) return;
     setEndGameSubmitting(true);
     setEndGameError(null);
     try {
@@ -721,8 +746,11 @@ export function WhoAmIRoomView({
   // pagehide/visibility effects above the same way any other tab-close
   // would be) --------------------------------------------------------------
   function handleLeaveGame() {
-    if (!window.confirm("Leave this game and go back home?")) return;
-    router.push("/");
+    requestConfirm(
+      "Leave this game and go back home?",
+      () => router.push("/"),
+      "Leave Game"
+    );
   }
 
   // ---- turn loop derived view state --------------------------------------
@@ -814,6 +842,18 @@ export function WhoAmIRoomView({
 
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : undefined;
   const selectedConversation = selectedPlayerId ? (conversationsByPlayer.get(selectedPlayerId) ?? []) : [];
+  // The selected opponent's own character card — this is the whole "Who Am
+  // I?" mechanic (everyone else can see your card, only you can't), and
+  // `opponentCharacterByPlayer` already carries this live for every other
+  // player (see the initial-load effect above); it just wasn't being read
+  // anywhere in the render before. Never resolves for `currentPlayer.id`
+  // itself since that row is always nulled out server-side.
+  const selectedOpponentCharacter = useMemo(() => {
+    if (!selectedPlayerId) return null;
+    const characterId = opponentCharacterByPlayer.get(selectedPlayerId);
+    if (!characterId) return null;
+    return characters.find((c) => c.id === characterId) ?? null;
+  }, [selectedPlayerId, opponentCharacterByPlayer, characters]);
   // True when the selected conversation is the one live question I can
   // currently ask (drives whether the chat composer shows a text input).
   const canAskInSelectedChat = isMyTurnToAsk && askTargetId === selectedPlayerId;
@@ -825,15 +865,19 @@ export function WhoAmIRoomView({
   // that character directly — replaces the old <select> dropdown, and only
   // ever offers characters that haven't already been crossed off (SPEC.md
   // restructure request).
+  function requestGuessForCharacter(characterId: string) {
+    const character = characters.find((c) => c.id === characterId);
+    requestConfirm(
+      character
+        ? `Guess "${character.name}"? A wrong guess ends your turn.`
+        : "Submit this guess? A wrong guess ends your turn.",
+      () => submitGuessForCharacter(characterId),
+      "Guess"
+    );
+  }
+
   async function submitGuessForCharacter(characterId: string) {
     if (!sessionId) return;
-    const character = characters.find((c) => c.id === characterId);
-    if (
-      character &&
-      !window.confirm(`Guess "${character.name}"? A wrong guess ends your turn.`)
-    ) {
-      return;
-    }
     setGuessSubmitting(true);
     setGuessError(null);
     setGuessResult(null);
@@ -1150,14 +1194,6 @@ export function WhoAmIRoomView({
             </p>
           )}
 
-          {liveEvents.length > 0 && (
-            <ul className="who-am-i-live-feed" aria-live="polite" aria-label="Recent activity">
-              {liveEvents.map((event) => (
-                <li key={event.id}>{describeTurnEvent(event)}</li>
-              ))}
-            </ul>
-          )}
-
           {hasSolved && (
             <p className="who-am-i-solved-note">
               You solved it! You can still answer everyone else&rsquo;s questions.
@@ -1217,6 +1253,48 @@ export function WhoAmIRoomView({
         </div>
       )}
 
+      {/* Our own confirmation dialog — see `requestConfirm` above; replaces
+          every window.confirm() in this component so confirmations never
+          surface as a native browser/tab-chrome prompt. */}
+      {confirmDialog && (
+        <div
+          className="who-am-i-modal-backdrop"
+          role="presentation"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            className="who-am-i-modal who-am-i-confirm-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="who-am-i-confirm-heading"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="who-am-i-confirm-heading">Are you sure?</h2>
+            <p>{confirmDialog.message}</p>
+            <div className="who-am-i-confirm-actions">
+              <button
+                type="button"
+                className="who-am-i-btn-outline"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="who-am-i-btn-leave"
+                onClick={() => {
+                  const { onConfirm } = confirmDialog;
+                  setConfirmDialog(null);
+                  onConfirm();
+                }}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="who-am-i-layout">
         {/* ---- Left sidebar: collapsed to just an avatar-icon rail, one per
               conversation (player), to save space — full name/question-count/
@@ -1260,7 +1338,10 @@ export function WhoAmIRoomView({
           )}
         </nav>
 
-        {/* ---- Chat panel: the full history with whoever's selected ---- */}
+        {/* ---- Chat column: the chat panel plus the player activity log
+              stacked below it (moved out of the top status strip so it
+              reads as part of the conversation area instead). ---- */}
+        <div className="who-am-i-chat-column">
         <section className="who-am-i-chat-panel" aria-label="Conversation">
           {!selectedPlayer ? (
             <p className="muted who-am-i-chat-empty">Select a player to see your conversation.</p>
@@ -1279,6 +1360,22 @@ export function WhoAmIRoomView({
                     {selectedConversation.length} question{selectedConversation.length === 1 ? "" : "s"} asked
                   </span>
                 </div>
+                {/* Their character card — visible to everyone but them,
+                    per the game's core rule (see selectedOpponentCharacter
+                    above). */}
+                {selectedOpponentCharacter && (
+                  <div
+                    className="who-am-i-chat-header-character"
+                    title={`${selectedPlayer.nickname} is ${selectedOpponentCharacter.name}`}
+                  >
+                    <span className="who-am-i-chat-header-character-image">
+                      <Image src={selectedOpponentCharacter.image_url} alt="" fill sizes="44px" />
+                    </span>
+                    <span className="who-am-i-chat-header-character-name">
+                      {selectedOpponentCharacter.name}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="who-am-i-chat-messages">
@@ -1427,6 +1524,21 @@ export function WhoAmIRoomView({
           )}
         </section>
 
+        {/* ---- Player logs: who asked/answered/ended their turn, most
+              recent first — moved here below the chat block per design
+              request. */}
+        {liveEvents.length > 0 && (
+          <div className="who-am-i-player-log" aria-label="Player activity log">
+            <h3 className="who-am-i-player-log-heading">Player Log</h3>
+            <ul className="who-am-i-live-feed" aria-live="polite">
+              {liveEvents.map((event) => (
+                <li key={event.id}>{describeTurnEvent(event)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        </div>
+
         {/* ---- Main content: My Deck — the primary visual focus ---- */}
         <section className="who-am-i-deck" aria-labelledby="who-am-i-deck-heading">
           <div className="who-am-i-deck-header">
@@ -1476,7 +1588,7 @@ export function WhoAmIRoomView({
                       <button
                         type="button"
                         className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                        onClick={() => !isCrossedOff && submitGuessForCharacter(character.id)}
+                        onClick={() => !isCrossedOff && requestGuessForCharacter(character.id)}
                         disabled={isCrossedOff || guessSubmitting}
                         aria-label={`Guess ${character.name}`}
                       >

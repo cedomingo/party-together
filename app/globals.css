@@ -995,6 +995,19 @@ button:disabled {
   margin-top: 0.5rem;
 }
 
+/* ---- Confirm dialog — our own replacement for window.confirm(), reusing
+   the How to Play modal's backdrop/card but with a Cancel/Confirm row. ---- */
+.who-am-i-confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.who-am-i-confirm-actions button {
+  flex: 1;
+  margin-top: 0;
+}
+
 .who-am-i-layout {
   display: grid;
   grid-template-columns: 72px 300px 1fr;
@@ -1078,9 +1091,19 @@ button:disabled {
   background: var(--coral);
 }
 
+/* ---- Chat column: the chat panel plus the player activity log stacked
+   below it. `grid-area: chat` lives here now (moved off .who-am-i-chat-panel
+   itself) since this wrapper is the actual grid item. ---------------------- */
+.who-am-i-chat-column {
+  grid-area: chat;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 /* ---- Chat panel: full history with the selected player ---------------- */
 .who-am-i-chat-panel {
-  grid-area: chat;
   display: flex;
   flex-direction: column;
   background: var(--paper);
@@ -1090,6 +1113,27 @@ button:disabled {
   min-height: 420px;
   max-height: 640px;
   overflow: hidden;
+}
+
+/* ---- Player log: who asked/answered/ended their turn, below the chat
+   panel (moved out of the top status strip). Same card treatment as the
+   sidebar/chat panel so it reads as part of the same column. ------------- */
+.who-am-i-player-log {
+  background: var(--paper);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-flat-sm);
+  padding: 0.65rem 0.8rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.who-am-i-player-log-heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-45);
 }
 
 .who-am-i-chat-empty {
@@ -1115,6 +1159,40 @@ button:disabled {
 .who-am-i-chat-header-name {
   font-family: var(--font-display);
   font-weight: 700;
+}
+
+/* ---- Their character card, shown in the chat header (SPEC.md §7: every
+   OTHER player's card is visible, just never your own). ------------------ */
+.who-am-i-chat-header-character {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+  background: var(--cream);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.who-am-i-chat-header-character-image {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--card-surface);
+}
+
+.who-am-i-chat-header-character-image img {
+  object-fit: cover;
+}
+
+.who-am-i-chat-header-character-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .who-am-i-chat-messages {
@@ -1300,9 +1378,14 @@ button:disabled {
   border: none;
   border-radius: 0;
   box-shadow: none;
-  padding: 1rem 3.5rem 1.9rem;
+  padding: 0.75rem 1.75rem 1.4rem;
   display: flex;
   align-items: center;
+  /* Capped so the board no longer stretches to fill the whole deck
+     column on wide screens — centered within it instead. Side padding
+     shrunk to match (was tuned for the old, much wider board). */
+  max-width: 460px;
+  margin: 0 auto;
 }
 
 .who-am-i-grid {
@@ -1328,8 +1411,9 @@ button:disabled {
   gap: 0rem;
   /* Fixed card size — independent of the grid's column width, thanks to
      justify-items: center above. Adjust this number to resize cards
-     without touching the board or the 5-column rule. */
-  width: 100px;
+     without touching the board or the 5-column rule. Shrunk to match
+     the smaller board (.who-am-i-deck-board's new max-width). */
+  width: 74px;
   padding: 0.3rem;
   border-radius: var(--radius-sm);
   background: var(--card-surface);
@@ -1364,7 +1448,7 @@ button:disabled {
 }
 
 .who-am-i-card-name {
-  font-size: 0.8rem;
+  font-size: 0.68rem;
   font-weight: 600;
   line-height: 1.2;
   word-break: break-word;
@@ -1640,6 +1724,22 @@ button:disabled {
 .who-am-i-recap-loser-badge {
   background: var(--danger);
   color: var(--cream);
+}
+
+/* ---- Recap end-screen actions (Play Again / More Games) — not wired up
+   to anything yet, just the UI. ------------------------------------------ */
+.who-am-i-recap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 2px dashed var(--ink-18);
+}
+
+.who-am-i-recap-actions button {
+  flex: 1;
+  min-width: 160px;
 }
 
 /* ---------------------------------------------------------------------

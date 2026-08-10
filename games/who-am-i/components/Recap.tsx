@@ -141,15 +141,22 @@ export function WhoAmIRecap({
               <h3>Didn&rsquo;t guess it</h3>
               <ul className="who-am-i-recap-unsolved-list">
                 {unsolved.map((entry) => (
-                  <li key={entry.playerId}>
-                    <strong>
-                      {entry.nickname}
-                      {entry.isYou && " (you)"}
-                    </strong>{" "}
-                    <span className="muted">
-                      was {entry.characterName ?? "Unknown"}
-                      {entry.guessedCharacterName &&
-                        ` \u2014 last guessed ${entry.guessedCharacterName}`}
+                  <li key={entry.playerId} className="who-am-i-recap-entry">
+                    <span className="who-am-i-recap-image">
+                      {entry.characterImageUrl && (
+                        <Image src={entry.characterImageUrl} alt="" fill sizes="56px" />
+                      )}
+                    </span>
+                    <span className="who-am-i-recap-info">
+                      <strong>
+                        {entry.nickname}
+                        {entry.isYou && " (you)"}
+                      </strong>
+                      <span className="muted">
+                        was {entry.characterName ?? "Unknown"}
+                        {entry.guessedCharacterName &&
+                          ` \u2014 last guessed ${entry.guessedCharacterName}`}
+                      </span>
                     </span>
                     {loserSet.has(entry.playerId) && (
                       <span className="badge who-am-i-recap-loser-badge">Loser</span>
@@ -209,6 +216,16 @@ export function WhoAmIRecap({
           </ul>
         </div>
       )}
+
+      {/* Not wired up yet — just the UI for now. */}
+      <div className="who-am-i-recap-actions">
+        <button type="button" className="who-am-i-btn-outline" onClick={() => {}}>
+          Play Again
+        </button>
+        <button type="button" className="who-am-i-btn-outline" onClick={() => {}}>
+          More Games
+        </button>
+      </div>
     </section>
   );
 }
