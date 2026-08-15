@@ -16,6 +16,7 @@
 // either way — it still only ever calls into the registry.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   ensureAnonSession,
@@ -39,18 +40,27 @@ type LoadState = "loading" | "ready" | "not-found" | "error";
 export function RoomClient({ code, game }: { code: string; game: string }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-  // Resolved client-side, not passed down from the Server Component page —
-  // GameConfig can carry a game-specific `onStart` function (see
-  // lib/games-registry.ts), and functions can't cross the Server Component
-  // -> Client Component boundary. Same reasoning as `getGameRoomView` below.
-  const gameConfig = useMemo(() => getGameConfig(game), [game]);
-
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+
+  // Resolved client-side, not passed down from the Server Component page —
+  // GameConfig can carry a game-specific `onStart` function (see
+  // lib/games-registry.ts), and functions can't cross the Server Component
+  // -> Client Component boundary. Same reasoning as `getGameRoomView` below.
+  //
+  // The URL slug (`game`) is the only source before the room loads; once
+  // the room is fetched, `room.game_id` is authoritative (join redirects by
+  // it, the start/play-again/switch-game routes all validate it), so the
+  // config follows the room's actual game from then on. This is what lets a
+  // player still sitting on the old game's room URL see the lobby with the
+  // NEW game after a host swaps games on /games?room=... — the realtime
+  // rooms UPDATE lands here (setRoom below) and this memo re-resolves
+  // without a reload.
+  const gameConfig = useMemo(() => getGameConfig(room?.game_id ?? game), [game, room?.game_id]);
 
   // Lazy-initialized straight from localStorage (see lib/avatar.ts) rather
   // than the two-phase load RoomForms.tsx needs: this branch never
@@ -374,6 +384,23 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return (
       <StatusScreen kind="error" title="Something went wrong">
         <p>{errorMessage ?? "Please try again."}</p>
+      </StatusScreen>
+    );
+  }
+
+  // A room created as a game-less shell on the home page but visited by URL
+  // before the host has picked a game. There's nothing meaningful to render
+  // (no game config, no lobby options, no game to start) — point the
+  // visitor back at the picker instead of showing a broken lobby. In normal
+  // flow this is unreachable: the host picks the game on /games and is
+  // redirected to this URL only after the game is set.
+  if (!room.game_id) {
+    return (
+      <StatusScreen kind="info" title="No game picked yet">
+        <p>
+          This room hasn&rsquo;t chosen a game yet. Head to the <Link href="/games">game picker</Link>{" "}
+          to pick one — you&rsquo;ll be taken to this room&rsquo;s waiting room.
+        </p>
       </StatusScreen>
     );
   }

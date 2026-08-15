@@ -31,8 +31,15 @@ export async function POST(request: Request) {
   }
 
   const { gameId, nickname, maxPlayers, mushroomIndex, accessoryIndex } = body;
-  if (typeof gameId !== "string" || gameId.length === 0) {
-    return NextResponse.json({ error: "gameId (string) is required." }, { status: 400 });
+  // gameId is optional: the home page creates a room as a game-less shell
+  // (code + max players) and the host picks the game afterwards on /games
+  // (see the switch-game route). Per-game landing pages still pass it here.
+  if (
+    gameId !== undefined &&
+    gameId !== null &&
+    (typeof gameId !== "string" || gameId.length === 0)
+  ) {
+    return NextResponse.json({ error: "gameId, if provided, must be a non-empty string." }, { status: 400 });
   }
   if (typeof nickname !== "string") {
     return NextResponse.json({ error: "nickname (string) is required." }, { status: 400 });
@@ -52,7 +59,7 @@ export async function POST(request: Request) {
     const supabase = await createSupabaseServerClient();
     const result = await createRoom({
       supabase,
-      gameId,
+      gameId: typeof gameId === "string" && gameId.length > 0 ? gameId : undefined,
       nickname,
       maxPlayers: parsedMaxPlayers,
       mushroomIndex: typeof mushroomIndex === "number" ? mushroomIndex : undefined,

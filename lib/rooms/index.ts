@@ -24,7 +24,12 @@ export interface Room {
   id: string;
   code: string;
   host_player_id: string | null;
-  game_id: string;
+  /** Null until the host picks a game on /games — rooms are created as a
+   * game-less shell (code + max players) and the game is assigned
+   * afterwards via the switch-game route (setRoomGame). Always set once
+   * anyone is in the waiting room, since join rejects game-less rooms and
+   * the game start routes refuse a mismatched/null game_id. */
+  game_id: string | null;
   status: RoomStatus;
   max_players: number | null;
   created_at: string;
@@ -193,7 +198,10 @@ export async function listPlayers(supabase: SupabaseClient, roomId: string): Pro
 
 export interface CreateRoomParams {
   supabase: SupabaseClient;
-  gameId: string;
+  /** Optional since the home page creates a game-less shell and the host
+   * picks the game afterwards (switch-game route). Per-game landing pages
+   * still pass it up front. */
+  gameId?: string | null;
   nickname: string;
   maxPlayers?: number | null;
   mushroomIndex?: number;
@@ -250,7 +258,9 @@ export async function createRoom({
       .from("rooms")
       .insert({
         code,
-        game_id: gameId,
+        // May be null: the home page creates a game-less shell and the
+        // host picks the game afterwards (switch-game route).
+        game_id: gameId ?? null,
         max_players: maxPlayers,
         expires_at: expiryTimestamp(),
       })
@@ -375,6 +385,17 @@ export async function joinRoomByCode(
     throw new RoomNotFoundError(`No room found for code "${normalizeRoomCode(code)}".`);
   }
 
+  // A game-less shell can't be joined yet — there's no /games/<game>/room/
+  // <code> URL to land on until the host picks a game (and JoinRoomResult
+  // .gameId, which the caller redirects by, would be null). The host can
+  // share the code right away; friends just have to try again once the
+  // game is chosen.
+  if (!room.game_id) {
+    throw new RoomError(
+      `Room "${normalizeRoomCode(code)}" hasn't picked a game yet — the host needs to choose one before anyone can join.`
+    );
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("players")
     .select("*")
@@ -481,6 +502,23 @@ export async function joinRoomByCode(
     playerId: playerRow.id,
     reconnected: false,
   };
+}
+
+/**
+ * Host-only assignment of which game a room will play (enforced by the
+ * `rooms_update_host_only` RLS policy — a non-host update simply matches
+ * zero rows). Used by the switch-game route when the host picks a game on
+ * /games?room=CODE: the room may have been created as a game-less shell
+ * (see `createRoom`) or be flipping from a finished game. Throws a
+ * RoomError on failure so callers can surface it.
+ */
+export async function setRoomGame(
+  supabase: SupabaseClient,
+  roomId: string,
+  gameId: string
+): Promise<void> {
+  const { error } = await supabase.from("rooms").update({ game_id: gameId }).eq("id", roomId);
+  if (error) throw new RoomError(error.message);
 }
 
 export async function touchRoomExpiry(supabase: SupabaseClient, roomId: string): Promise<void> {

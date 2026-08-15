@@ -70,6 +70,11 @@ interface WhoAmIRecapProps {
   onPlayAgain: () => void;
   playAgainSubmitting: boolean;
   playAgainError: string | null;
+  /** Host-only: sends the host to /games?room=CODE to swap the room to a
+   * different game without anyone leaving it (see
+   * app/api/rooms/switch-game/route.ts). Non-hosts never see the control
+   * that would call this. */
+  onPlayMoreGames: () => void;
 }
 
 export function WhoAmIRecap({
@@ -85,6 +90,7 @@ export function WhoAmIRecap({
   onPlayAgain,
   playAgainSubmitting,
   playAgainError,
+  onPlayMoreGames,
 }: WhoAmIRecapProps) {
   const solved = entries.filter((entry) => entry.rank !== null);
   const unsolved = entries.filter((entry) => entry.rank === null);
@@ -232,27 +238,31 @@ export function WhoAmIRecap({
         </div>
       )}
 
-      {/* "Play Again" sends the room back to the lobby (host-only — see
-          onPlayAgain's doc comment on WhoAmIRecapProps) so the host can
-          invite people again before starting a fresh round. Non-hosts get
-          a waiting note instead of a dead button. "More Games" is still
-          just a UI stub. */}
+      {/* Host-only actions, mirroring the End Game vs Leave Game split
+          elsewhere in this game: "Play Again" sends the room back to the
+          lobby (onPlayAgain — app/api/games/who-am-i/play-again/route.ts)
+          for a fresh round of the SAME game; "Play More Games" sends the
+          host to /games?room=CODE to swap the room to a DIFFERENT game
+          (app/api/rooms/switch-game/route.ts) without anyone leaving.
+          Non-hosts get a single waiting note instead of dead buttons. */}
       <div className="who-am-i-recap-actions">
         {isHost ? (
-          <button
-            type="button"
-            className="who-am-i-btn-outline"
-            onClick={onPlayAgain}
-            disabled={playAgainSubmitting}
-          >
-            {playAgainSubmitting ? "Starting…" : "Play Again"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="who-am-i-btn-outline"
+              onClick={onPlayAgain}
+              disabled={playAgainSubmitting}
+            >
+              {playAgainSubmitting ? "Starting…" : "Play Again"}
+            </button>
+            <button type="button" className="who-am-i-btn-outline" onClick={onPlayMoreGames}>
+              Play More Games
+            </button>
+          </>
         ) : (
-          <p className="muted who-am-i-recap-waiting">Waiting for the host to start a new game…</p>
+          <p className="muted who-am-i-recap-waiting">Waiting for the host to start the next game…</p>
         )}
-        <button type="button" className="who-am-i-btn-outline" onClick={() => {}}>
-          More Games
-        </button>
       </div>
       {playAgainError && (
         <p className="field-error" role="alert">

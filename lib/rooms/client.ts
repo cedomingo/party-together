@@ -36,7 +36,10 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export async function createRoomViaApi(params: {
-  gameId: string;
+  /** Optional — the home page creates a game-less shell and the host picks
+   * the game afterwards on /games; per-game landing pages pass it up
+   * front. */
+  gameId?: string | null;
   nickname: string;
   maxPlayers?: number | null;
   mushroomIndex?: number;

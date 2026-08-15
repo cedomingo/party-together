@@ -1,32 +1,27 @@
 "use client";
 
-// Platform-core "Create Room" form (SPEC.md §7). Game-agnostic: it creates
-// a room for the single game it's told about via `fixedGameId` — currently
-// only the per-game landing pages at /games/<id> render it, where the game
-// is fixed by the page itself. Choosing a game is otherwise done on the
-// /games page (app/components/GamePicker.tsx + GamesListing.tsx): either by
-// creating a game-less shell on the home page first (CreateRoomShellForm)
-// and picking there, or from the /games?room=CODE swap flow.
+// Platform-core "Create Room" form for the SHELL-first flow (SPEC.md §7,
+// game-agnostic). It creates a room with NO game attached yet — just the
+// room code + max players — and sends the host to /games?room=CODE, where
+// they can share the code and pick a game (app/components/GamesListing.tsx
+// + app/api/rooms/switch-game/route.ts). The game is chosen AFTER
+// creation, never here, so this form deliberately has no game picker.
 //
 // `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
-// via RoomForms.tsx) rather than a field of its own — there used to be a
-// second "Your nickname" input here, but the avatar creator above already
-// asks for a name once, and everything on this page shares it.
+// via RoomForms.tsx) rather than a field of its own — the avatar creator
+// above already asks for a name once, and everything on this page shares it.
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { RoomError } from "@/lib/rooms";
 import { createRoomViaApi } from "@/lib/rooms/client";
 
-export function CreateRoomForm({
-  fixedGameId,
+export function CreateRoomShellForm({
   nickname,
   mushroomIndex,
   accessoryIndex,
   avatarAssetsReady = true,
 }: {
-  /** The game this form creates a room for — fixed by the page that renders it. */
-  fixedGameId: string;
   nickname: string;
   mushroomIndex: number;
   accessoryIndex: number;
@@ -50,13 +45,14 @@ export function CreateRoomForm({
     try {
       const parsedMax = maxPlayers.trim() ? Number(maxPlayers) : null;
       const { code } = await createRoomViaApi({
-        gameId: fixedGameId,
+        // No gameId — the room is created as a game-less shell; the host
+        // picks the game on /games?room=CODE afterwards.
         nickname,
         maxPlayers: parsedMax && parsedMax > 0 ? parsedMax : null,
         mushroomIndex,
         accessoryIndex,
       });
-      router.push(`/games/${fixedGameId}/room/${code}`);
+      router.push(`/games?room=${code}`);
     } catch (err) {
       setError(err instanceof RoomError ? err.message : "Something went wrong creating the room.");
       setLoading(false);
@@ -84,7 +80,7 @@ export function CreateRoomForm({
         </p>
       )}
 
-      <button type="submit" disabled={loading || !avatarAssetsReady}>
+      <button type="submit" disabled={loading || !nickname.trim() || !avatarAssetsReady}>
         {loading ? "Creating…" : avatarAssetsReady ? "Create a room" : "Loading avatar…"}
       </button>
     </form>

@@ -966,6 +966,7 @@ export function WhoAreYouRoomView({
           onPlayAgain={handlePlayAgain}
           playAgainSubmitting={playAgainSubmitting}
           playAgainError={playAgainError}
+          onPlayMoreGames={() => router.push(`/games?room=${room.code}`)}
         />
       </div>
     );

@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { AvatarCreator } from "@/app/components/AvatarCreator";
 import { CreateRoomForm } from "@/app/components/CreateRoomForm";
+import { CreateRoomShellForm } from "@/app/components/CreateRoomShellForm";
 import { JoinRoomForm } from "@/app/components/JoinRoomForm";
 import {
   DEFAULT_AVATAR,
@@ -18,9 +19,17 @@ import {
   saveStoredAvatar,
   type AvatarSelection,
 } from "@/lib/avatar";
-import type { GameSummary } from "@/lib/games-registry";
 
-export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedGameId?: string }) {
+export function RoomForms({
+  fixedGameId,
+  shellCreate = false,
+}: {
+  fixedGameId?: string;
+  /** Render the shell-first create form (game-less room, game picked later
+   * on /games) instead of the fixed-game create form. The home page passes
+   * this; the per-game landing pages create directly for their fixed game. */
+  shellCreate?: boolean;
+}) {
   const [avatar, setAvatar] = useState<AvatarSelection>(DEFAULT_AVATAR);
   const [hydrated, setHydrated] = useState(false);
   // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
@@ -64,14 +73,24 @@ export function RoomForms({ games, fixedGameId }: { games: GameSummary[]; fixedG
       />
 
       <div className="two-up">
-        <CreateRoomForm
-          games={games}
-          fixedGameId={fixedGameId}
-          nickname={avatar.name}
-          mushroomIndex={avatar.mushroomIndex}
-          accessoryIndex={avatar.accessoryIndex}
-          avatarAssetsReady={avatarAssetsReady}
-        />
+        {shellCreate ? (
+          <CreateRoomShellForm
+            nickname={avatar.name}
+            mushroomIndex={avatar.mushroomIndex}
+            accessoryIndex={avatar.accessoryIndex}
+            avatarAssetsReady={avatarAssetsReady}
+          />
+        ) : (
+          fixedGameId && (
+            <CreateRoomForm
+              fixedGameId={fixedGameId}
+              nickname={avatar.name}
+              mushroomIndex={avatar.mushroomIndex}
+              accessoryIndex={avatar.accessoryIndex}
+              avatarAssetsReady={avatarAssetsReady}
+            />
+          )
+        )}
         <JoinRoomForm
           nickname={avatar.name}
           mushroomIndex={avatar.mushroomIndex}

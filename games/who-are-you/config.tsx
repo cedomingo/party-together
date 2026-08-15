@@ -32,7 +32,7 @@ export const whoAreYouConfig: GameConfig = {
     "Everyone secretly picks a character. Ask yes/no questions to figure out who everyone else picked — before they figure out you.",
   minPlayers: 2,
   maxPlayers: 12,
-  thumbnailPath: "/characters/who-am-i/thumbnail.png",
+  thumbnailPath: "/ui/gamecovers/who-are-you.png",
   onStart: startWhoAreYouGame,
   LobbyOptions: WhoAreYouLobbyOptions,
   defaultLobbyOptions: DEFAULT_LOBBY_OPTIONS,

@@ -369,6 +369,92 @@ button:disabled {
 }
 
 /* -----------------------------------------------------------------------
+   Game picker — searchable cover-card grid for choosing a game
+   (app/components/GamePicker.tsx). Reused by the create-room form and the
+   /games listing page. Cards are <button>s (whole card is the click
+   target), with a search field above that filters by name/description
+   client-side. Same paper-card language as .panel-form so it reads as
+   part of the family.
+   ----------------------------------------------------------------------- */
+.game-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.game-picker-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 480px) {
+  .game-picker-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Card overrides for the global `button` styles (display-font text,
+   fit-content width, generous padding): a card is full-width, body-font,
+   and flush — the cover bleeds to its edges. */
+.game-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  font: 500 0.95rem/1.35 var(--font-body);
+  background: var(--paper);
+  border: 2.5px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-flat-sm);
+}
+
+.game-picker-card.selected {
+  border-color: var(--accent);
+  box-shadow:
+    var(--shadow-flat-sm),
+    0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.game-picker-cover {
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--cream);
+  border-bottom: 2px solid var(--border);
+}
+
+.game-picker-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.game-picker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem 0.65rem;
+}
+
+.game-picker-name {
+  font: 700 1rem/1.2 var(--font-display);
+}
+
+.game-picker-desc {
+  color: var(--ink-45);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+/* -----------------------------------------------------------------------
    Avatar creator — sits above the Create/Join two-up on the home page and
    every per-game landing page (app/components/RoomForms.tsx). Same paper
    card language as .panel-form (hand-inked border, banner strip) so it
@@ -1956,9 +2042,10 @@ button:disabled {
   color: var(--cream);
 }
 
-/* ---- Recap end-screen actions. "Play Again" (host-only) sends the room
-   back to the lobby — see Recap.tsx's onPlayAgain. "More Games" is still
-   just UI, not wired to anything yet. -------------------------------------- */
+/* ---- Recap end-screen actions. Host-only: "Play Again" (same game, back
+   to the lobby — Recap.tsx's onPlayAgain) and "Play More Games" (swap to a
+   different game via /games?room=CODE — Recap.tsx's onPlayMoreGames).
+   Non-hosts get the .who-am-i-recap-waiting note instead of buttons. ----- */
 .who-am-i-recap-actions {
   display: flex;
   flex-wrap: wrap;
