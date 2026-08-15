@@ -25,7 +25,7 @@ export const whoAmIConfig: GameConfig = {
   displayName: "Who Am I?",
   description:
     "Everyone can see your secret character except you. Ask yes/no questions to figure out who you are before anyone else does.",
-  minPlayers: 3,
+  minPlayers: 2,
   maxPlayers: 12,
   thumbnailPath: "/characters/who-am-i/thumbnail.png",
   onStart: startWhoAmIGame,

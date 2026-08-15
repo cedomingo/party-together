@@ -80,8 +80,11 @@ export async function POST(request: Request) {
   }
 
   const playerIds = (roomPlayers ?? []).map((p) => p.id as string);
-  if (playerIds.length === 0) {
-    return NextResponse.json({ error: "No players in the room to start with." }, { status: 400 });
+  if (playerIds.length < 2) {
+    return NextResponse.json(
+      { error: "At least 2 players are needed to start the game." },
+      { status: 400 }
+    );
   }
 
   const { data: sessionRow, error: sessionError } = await supabase

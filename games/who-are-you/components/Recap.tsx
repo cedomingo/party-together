@@ -8,6 +8,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { cardSoundHandlers } from "@/lib/animalSounds";
 import type { WhoAreYouBaseMode } from "@/games/who-are-you/logic/sessionState";
 import type { WhoAreYouSolvedPairing } from "@/games/who-are-you/logic/turnState";
 import { rivalOf } from "@/games/who-are-you/logic/turnState";
@@ -171,8 +172,8 @@ export function WhoAreYouRecap({
             <div className="who-are-you-recap-panel" role="tabpanel">
               <div className="who-are-you-recap-player-summary">
                 {selected.characterImageUrl && (
-                  <span className="who-am-i-recap-image">
-                    <Image src={selected.characterImageUrl} alt="" fill sizes="56px" />
+                  <span className="who-am-i-recap-image" {...cardSoundHandlers(selected.characterName)}>
+                    <Image src={selected.characterImageUrl} alt="" fill sizes="56px" draggable={false} />
                   </span>
                 )}
                 <div>

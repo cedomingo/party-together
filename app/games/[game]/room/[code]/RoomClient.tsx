@@ -442,13 +442,17 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
                     onChange={setLobbyOptions}
                   />
                 )}
-                <button type="button" onClick={handleStartGame} disabled={starting}>
+                <button
+                  type="button"
+                  onClick={handleStartGame}
+                  disabled={starting || (gameConfig ? players.length < gameConfig.minPlayers : false)}
+                >
                   {starting ? "Starting…" : "Start Game"}
                 </button>
                 {gameConfig && players.length < gameConfig.minPlayers && (
-                  <p className="muted">
-                    {gameConfig.displayName} usually wants at least {gameConfig.minPlayers} players — you
-                    can still start early.
+                  <p className="muted" role="status">
+                    {gameConfig.displayName} needs at least {gameConfig.minPlayers} players to
+                    start — {gameConfig.minPlayers - players.length} more needed.
                   </p>
                 )}
               </>

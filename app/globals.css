@@ -822,34 +822,10 @@ button:disabled {
   white-space: nowrap;
 }
 
-.who-am-i-status-badge-your-turn {
-  background: var(--special);
-  border-color: var(--special);
-  color: #fff;
-}
-
-.who-am-i-status-badge-asking {
-  background: var(--mustard);
-  border-color: var(--mustard);
-}
-
-.who-am-i-status-badge-reviewing {
-  background: var(--coral);
-  border-color: var(--coral);
-  color: #fff;
-}
-
 .who-am-i-status-badge-waiting,
 .who-am-i-status-badge-setup {
   background: var(--cream);
   color: var(--ink-70);
-}
-
-.who-am-i-topbar-subtext {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--ink-70);
-  max-width: 32ch;
 }
 
 .who-am-i-topbar-center {
@@ -902,6 +878,37 @@ button:disabled {
   align-items: center;
   gap: 0.6rem;
   flex: 0 0 auto;
+}
+
+/* The status badge ("Pick your character", "Ask or guess for X", …) is the
+   header's centerpiece — pin it to the exact center. On desktop the
+   left/right groups are unequal widths (avatar + name + "You are" chip vs
+   the buttons), so plain flex centering leaves the badge visibly off-center;
+   absolute positioning at 50% guarantees true centering, and there's always
+   room for the badge between the two groups at these widths. On narrower
+   screens the badge wraps onto its own centered line instead of being
+   squeezed between them. */
+@media (min-width: 981px) {
+  .who-am-i-topbar {
+    position: relative;
+  }
+
+  .who-am-i-topbar-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    flex: none;
+    width: auto;
+    max-width: 560px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 980px) {
+  .who-am-i-topbar-center {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
 }
 
 .who-am-i-btn-outline {
@@ -1012,6 +1019,24 @@ button:disabled {
   max-width: 1180px;
   margin: 0 auto;
   align-items: start;
+}
+
+/* Board-only variant of the same layout — used by "Who Are You?"'s
+   pick-a-character screen so it reads as the playing board (same shell,
+   topbar, and deck) minus the sidebar/chat columns. The deck is centered
+   at the same width the in-game deck column occupies on desktop (1180px
+   layout minus the 72px sidebar, 300px chat, and 2 × 1rem gaps). The
+   responsive breakpoints below apply to this variant too, so it collapses
+   exactly the way the real layout does. */
+.who-am-i-layout-deck-only {
+  grid-template-columns: 1fr;
+  grid-template-areas: "deck";
+  justify-items: center;
+}
+
+.who-am-i-layout-deck-only .who-am-i-deck {
+  width: 100%;
+  max-width: 776px;
 }
 
 /* ---- Sidebar: collapsed to an avatar-icon rail, one per conversation -- */
@@ -1216,6 +1241,61 @@ button:disabled {
   font-size: 0.78rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Hover/tap-to-peek on your own avatar (Who Are You? turns phase): hovering
+   (desktop) or tap-and-hold (mobile) cross-fades the character you picked
+   over your mushroom avatar — and fades back when you stop. Driven purely
+   by :hover/:active so it needs no JS state; the invisible no-op touch
+   handler on the element makes iOS Safari apply :active while touching.
+   Deliberately NOT clickable: no pointer cursor, no onClick — it's a
+   reveal, not a button. The character image sits in the same black-edged
+   "dish" as the mushroom art (same border + inset shadow as .avatar-icon),
+   clipped inside its own round stage. */
+.who-am-i-avatar-reveal {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.who-am-i-avatar-reveal-own {
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+  transition: opacity 0.25s ease;
+}
+
+.who-am-i-avatar-reveal-character {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--cream);
+  /* Same "black dish" treatment as .avatar-icon: dark hand-inked edge +
+     inset shadow so the reveal reads as the avatar's own stage with the
+     character art swapped in. The 2.5px border lives inside the 40px box,
+     so the image fills the same ~35px interior the mushroom art does. */
+  border: 2.5px solid var(--border);
+  box-shadow: inset 0 2px 6px rgba(47, 42, 34, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.who-am-i-avatar-reveal-character img {
+  object-fit: cover;
+}
+
+.who-am-i-avatar-reveal:hover .who-am-i-avatar-reveal-own,
+.who-am-i-avatar-reveal:active .who-am-i-avatar-reveal-own {
+  opacity: 0;
+}
+
+.who-am-i-avatar-reveal:hover .who-am-i-avatar-reveal-character,
+.who-am-i-avatar-reveal:active .who-am-i-avatar-reveal-character {
+  opacity: 1;
 }
 
 .who-am-i-chat-messages {
@@ -1525,7 +1605,6 @@ button:disabled {
   box-sizing: border-box;
 }
 
-.who-are-you-picker,
 .who-are-you-waiting {
   max-width: 1180px;
   margin: 0 auto;
@@ -1955,6 +2034,11 @@ button:disabled {
   }
 
   .who-am-i-topbar-right {
+    justify-content: center;
+  }
+
+  /* …and the status badge stays centered on its own row on phones too. */
+  .who-am-i-topbar-center {
     justify-content: center;
   }
 

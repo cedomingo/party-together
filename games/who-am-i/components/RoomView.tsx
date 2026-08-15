@@ -60,6 +60,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AvatarIcon } from "@/app/components/AvatarIcon";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { playCharacterSound } from "@/lib/animalSounds";
 import type { GameRoomViewProps } from "@/lib/games-registry";
 import {
   currentAskerId,
@@ -963,54 +964,32 @@ export function WhoAmIRoomView({
   const activeTurnPlayerOffline =
     !!activeTurnPlayerId && activeTurnPlayerId !== currentPlayer.id && !onlineIds.has(activeTurnPlayerId);
 
-  // ---- top bar: round counter + status pill -------------------------------
-  // "Round" here is a player's turn at asking, one full lap of `turnOrder`
-  // per game — there's no separate round counter in the data model, but
+  // ---- top bar: turn counter + status pill --------------------------------
+  // "Turn" is one full lap of `turnOrder` — a player's turn at asking.
+  // There's no separate counter in the data model, but
   // `currentTurnIndex`/`turnOrder.length` already mean exactly that (see
-  // ../logic/turnState.ts).
-  const totalRounds = turnState?.turnOrder.length ?? players.length;
-  const currentRound = turnState ? turnState.currentTurnIndex + 1 : 1;
+  // ../logic/turnState.ts). Named "Turn N" to match Who Are You's header
+  // conventions (instead of "Round N of M").
+  const currentTurn = turnState ? turnState.currentTurnIndex + 1 : 1;
 
-  type StatusTone = "asking" | "your-turn" | "reviewing" | "waiting" | "setup";
-  const statusInfo: { badge: string; tone: StatusTone; subtext: string } = !turnState
-    ? { badge: "Setting Up", tone: "setup", subtext: "Setting up the turn order…" }
+  // The header's center pill — same wording and naming conventions as Who
+  // Are You's header ("Ask or guess for X.", "Waiting for Y…", "Your turn
+  // to answer."…) so both games read identically. The longer "what to do"
+  // line that used to sit below the header is gone — its text now lives in
+  // the pill itself.
+  const statusSubtext = !turnState
+    ? "Setting Up"
     : turnState.phase === "asking"
       ? isMyTurnToAsk
-        ? {
-            badge: "You're Asking",
-            tone: "your-turn",
-            subtext: `It's your turn to ask ${nicknameFor(askTargetId ?? "")} a question.`,
-          }
-        : askTargetId === currentPlayer.id
-          ? {
-              badge: "You're Up",
-              tone: "your-turn",
-              subtext: `${nicknameFor(askerId ?? "")} is about to ask you a question.`,
-            }
-          : {
-              badge: "Asking",
-              tone: "asking",
-              subtext: `Waiting for ${nicknameFor(askerId ?? "")} to ask ${nicknameFor(askTargetId ?? "")}.`,
-            }
+        ? `Ask or guess for ${nicknameFor(askTargetId ?? "")}.`
+        : `Waiting for ${nicknameFor(askerId ?? "")}…`
       : turnState.phase === "answering"
         ? isMyTurnToAnswer
-          ? { badge: "You're Answering", tone: "your-turn", subtext: "Your turn to answer." }
-          : {
-              badge: "Answering",
-              tone: "asking",
-              subtext: `Waiting for ${nicknameFor(responderId ?? "")} to answer.`,
-            }
+          ? "Your turn to answer."
+          : `Waiting for ${nicknameFor(responderId ?? "")} to answer.`
         : isReviewingMyTurn
-          ? {
-              badge: "Reviewing",
-              tone: "reviewing",
-              subtext: "All answers are in — review them, then end your turn.",
-            }
-          : {
-              badge: "Reviewing",
-              tone: "waiting",
-              subtext: `Waiting for ${nicknameFor(askerId ?? "")} to finish their turn.`,
-            };
+          ? "Review, then press I'm Done."
+          : `Waiting for ${nicknameFor(askerId ?? "")} to finish.`;
 
   // ---- Broadcast-derived live activity feed (SPEC.md §9) -----------------
   function describeTurnEvent(event: WhoAmITurnEvent): string {
@@ -1140,48 +1119,16 @@ export function WhoAmIRoomView({
           <AvatarIcon
             mushroomIndex={currentPlayer.mushroom_index}
             accessoryIndex={currentPlayer.accessory_index}
-            size={48}
-            wiggle={false}
+            size={40}
           />
           <div className="who-am-i-topbar-left-info">
-            <span className="who-am-i-round-label">
-              Round {currentRound} of {totalRounds}
-            </span>
-            <span className={`who-am-i-status-badge who-am-i-status-badge-${statusInfo.tone}`}>
-              {statusInfo.badge}
-            </span>
-            {/* aria-live so screen reader users hear whose turn it is
-                without needing to re-focus anything (SPEC.md §11: "aria
-                labels on ... turn indicators"). */}
-            <p className="who-am-i-topbar-subtext" role="status" aria-live="polite">
-              {statusInfo.subtext}
-            </p>
+            <strong>{currentPlayer.nickname}</strong>
+            <span className="muted">Turn {currentTurn}</span>
           </div>
         </div>
 
         <div className="who-am-i-topbar-center">
-          <ul className="who-am-i-player-row" role="list">
-            {players.map((player) => {
-              const isYou = player.id === currentPlayer.id;
-              const isActiveTurn = player.id === activeTurnPlayerId;
-              return (
-                <li
-                  key={player.id}
-                  className={`who-am-i-player-chip${isActiveTurn ? " who-am-i-player-chip-active" : ""}`}
-                >
-                  <AvatarIcon
-                    mushroomIndex={player.mushroom_index}
-                    accessoryIndex={player.accessory_index}
-                    size={40}
-                    wiggle={false}
-                  />
-                  <span className={isYou ? "who-am-i-player-chip-you" : undefined}>
-                    {isYou ? "You" : player.nickname}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <span className="who-am-i-status-badge who-am-i-status-badge-waiting">{statusSubtext}</span>
         </div>
 
         <div className="who-am-i-topbar-right">
@@ -1439,7 +1386,7 @@ export function WhoAmIRoomView({
                     title={`${selectedPlayer.nickname} is ${selectedOpponentCharacter.name}`}
                   >
                     <span className="who-am-i-chat-header-character-image">
-                      <Image src={selectedOpponentCharacter.image_url} alt="" fill sizes="44px" />
+                      <Image src={selectedOpponentCharacter.image_url} alt="" fill sizes="44px" draggable={false} />
                     </span>
                     <span className="who-am-i-chat-header-character-name">
                       {selectedOpponentCharacter.name}
@@ -1682,13 +1629,17 @@ export function WhoAmIRoomView({
                     <li key={character.id}>
                       <button
                         type="button"
-                        className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                        onClick={() => !isCrossedOff && requestGuessForCharacter(character.id)}
-                        disabled={isCrossedOff || guessSubmitting}
-                        aria-label={`Guess ${character.name}`}
+                        className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}          onClick={() => {
+            if (!isCrossedOff) {
+              playCharacterSound(character.name);
+              requestGuessForCharacter(character.id);
+            }
+          }}
+          disabled={isCrossedOff || guessSubmitting}
+          aria-label={`Guess ${character.name}`}
                       >
                         <span className="who-am-i-card-image">
-                          <Image src={character.image_url} alt="" fill sizes="96px" />
+                          <Image src={character.image_url} alt="" fill sizes="96px" draggable={false} />
                         </span>
                         <span className="who-am-i-card-name">{character.name}</span>
                       </button>
@@ -1700,12 +1651,15 @@ export function WhoAmIRoomView({
                     <button
                       type="button"
                       className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                      onClick={() => toggleCharacter(character.id)}
-                      aria-pressed={isCrossedOff}
-                      aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
+          onClick={() => {
+            playCharacterSound(character.name);
+            toggleCharacter(character.id);
+          }}
+          aria-pressed={isCrossedOff}
+          aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
                     >
                       <span className="who-am-i-card-image">
-                        <Image src={character.image_url} alt="" fill sizes="96px" />
+                        <Image src={character.image_url} alt="" fill sizes="96px" draggable={false} />
                       </span>
                       <span className="who-am-i-card-name">{character.name}</span>
                     </button>

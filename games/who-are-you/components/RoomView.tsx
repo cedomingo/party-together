@@ -8,8 +8,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { AvatarIcon } from "@/app/components/AvatarIcon";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { cardSoundHandlers, playCharacterSound } from "@/lib/animalSounds";
 import type { GameRoomViewProps } from "@/lib/games-registry";
 import {
   isWhoAreYouSetupState,
@@ -70,6 +72,43 @@ function formatAnswer(value: AnswerValue): string {
   return `"${value}"`;
 }
 
+/** Shared "How to Play" modal — rendered by both the setup and turns phases
+ *  so the pick-a-character screen carries the same topbar chrome as the
+ *  playing board. */
+function WhoAreYouHowToPlayModal({
+  open,
+  onClose,
+  description,
+}: {
+  open: boolean;
+  onClose: () => void;
+  description?: string;
+}) {
+  if (!open) return null;
+  return (
+    <div className="who-am-i-modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="who-am-i-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="who-are-you-howtoplay-heading"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="who-are-you-howtoplay-heading">How to Play</h2>
+        <p>{description}</p>
+        <ul>
+          <li>Each opponent has their own board — cross-offs don&rsquo;t carry over.</li>
+          <li>On your turn, ask (or guess) each unsolved opponent once.</li>
+          <li>A correct guess solves that opponent only; a wrong guess wastes their slot this turn.</li>
+        </ul>
+        <button type="button" onClick={onClose}>
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 type LoadState = "loading" | "ready" | "not-started" | "error";
 
 const MAX_QUESTION_LENGTH = 280;
@@ -82,6 +121,7 @@ export function WhoAreYouRoomView({
   onlineIds,
 }: GameRoomViewProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const router = useRouter();
 
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -105,6 +145,16 @@ export function WhoAreYouRoomView({
   const [ownSelection, setOwnSelection] = useState<OwnSelectionRow | null>(null);
   const [readyPlayerIds, setReadyPlayerIds] = useState<Set<string>>(new Set());
   const [boardsByTarget, setBoardsByTarget] = useState<Map<string, BoardRow>>(new Map());
+  // Local-first cross-off state per target board — mirrors Who Am I's
+  // `crossedOff` exactly. Seeded from the DB only on initial load (and the
+  // begin-turns board reload), then updated optimistically on tap and
+  // persisted best-effort. The realtime and resync handlers deliberately do
+  // NOT touch this: a board-row echo / refetch can carry a
+  // crossed_off_character_ids snapshot taken before a tap's UPDATE committed,
+  // and re-applying it would make a card flicker back for a beat.
+  const [crossedOffByTarget, setCrossedOffByTarget] = useState<
+    Map<string, Set<string>>
+  >(new Map());
   const [questions, setQuestions] = useState<QuestionLogRow[]>([]);
   const [endedAt, setEndedAt] = useState<string | null>(null);
 
@@ -126,6 +176,12 @@ export function WhoAreYouRoomView({
   const [answering, setAnswering] = useState(false);
   const [doneError, setDoneError] = useState<string | null>(null);
   const [endingTurn, setEndingTurn] = useState(false);
+  // "I've asked/guessed this opponent (player id) and their answer is in —
+  // waiting for the player to press "I'm Done" before the UI moves to the
+  // next chat." The game state itself advances server-side; this only
+  // paces the UI (no auto-jumping between chats mid-turn), and tracks the
+  // exact opponent so the "X answered" message is always accurate.
+  const [pendingAdvanceId, setPendingAdvanceId] = useState<string | null>(null);
   const [guessSubmitting, setGuessSubmitting] = useState(false);
   const [guessError, setGuessError] = useState<string | null>(null);
   const [endGameSubmitting, setEndGameSubmitting] = useState(false);
@@ -226,6 +282,14 @@ export function WhoAreYouRoomView({
         setBoardsByTarget(
           new Map(
             ((boardRows ?? []) as BoardRow[]).map((row) => [row.target_player_id, row])
+          )
+        );
+        setCrossedOffByTarget(
+          new Map(
+            ((boardRows ?? []) as BoardRow[]).map((row) => [
+              row.target_player_id,
+              new Set(row.crossed_off_character_ids ?? []),
+            ])
           )
         );
 
@@ -423,6 +487,14 @@ export function WhoAreYouRoomView({
             setBoardsByTarget(
               new Map((boardRows as BoardRow[]).map((row) => [row.target_player_id, row]))
             );
+            setCrossedOffByTarget(
+              new Map(
+                (boardRows as BoardRow[]).map((row) => [
+                  row.target_player_id,
+                  new Set(row.crossed_off_character_ids ?? []),
+                ])
+              )
+            );
           }
         }
       } catch (err) {
@@ -525,9 +597,11 @@ export function WhoAreYouRoomView({
 
   // ---- board cross-offs (per selected opponent) --------------------------
   const selectedBoard = selectedPlayerId ? boardsByTarget.get(selectedPlayerId) : undefined;
+  // Local-first (see crossedOffByTarget above) — realtime/resync never
+  // overwrite it, so a tap is never stomped by a stale board echo.
   const crossedOff = useMemo(
-    () => new Set(selectedBoard?.crossed_off_character_ids ?? []),
-    [selectedBoard]
+    () => crossedOffByTarget.get(selectedPlayerId ?? "") ?? new Set<string>(),
+    [crossedOffByTarget, selectedPlayerId]
   );
 
   const persistCrossedOff = useCallback(
@@ -540,6 +614,8 @@ export function WhoAreYouRoomView({
         .eq("viewer_player_id", currentPlayer.id)
         .eq("target_player_id", targetId);
       if (error) {
+        // Non-fatal: local state already reflects the tap, and the next
+        // toggle re-sends the full set anyway (same as Who Am I).
         console.error("Failed to save crossed-off state:", error.message);
       }
     },
@@ -548,18 +624,13 @@ export function WhoAreYouRoomView({
 
   function toggleCharacter(characterId: string) {
     if (!selectedPlayerId) return;
-    setBoardsByTarget((prev) => {
-      const existing = prev.get(selectedPlayerId);
-      if (!existing) return prev;
-      const nextSet = new Set(existing.crossed_off_character_ids ?? []);
+    setCrossedOffByTarget((prev) => {
+      const nextSet = new Set(prev.get(selectedPlayerId) ?? []);
       if (nextSet.has(characterId)) nextSet.delete(characterId);
       else nextSet.add(characterId);
       void persistCrossedOff(selectedPlayerId, nextSet);
       const next = new Map(prev);
-      next.set(selectedPlayerId, {
-        ...existing,
-        crossed_off_character_ids: Array.from(nextSet),
-      });
+      next.set(selectedPlayerId, nextSet);
       return next;
     });
   }
@@ -614,14 +685,23 @@ export function WhoAreYouRoomView({
   }, [otherPlayers, selectedPlayerId]);
 
   useEffect(() => {
-    if (isMyTurnToAsk && askTargetId) {
-      setSelectedPlayerId(askTargetId);
-      setGuessMode(false);
-    } else if (isMyTurnToAnswer && askerId) {
+    // Auto-select only when the game is directing *us* somewhere we haven't
+    // already engaged with: answering someone's question, or a fresh ask
+    // target. Never yank the selection off the chat we just asked once the
+    // answer is in — that's the manual "I'm Done → next chat" pacing.
+    if (isMyTurnToAnswer && askerId) {
       setSelectedPlayerId(askerId);
       setGuessMode(false);
+    } else if (isMyTurnToAsk && askTargetId && !pendingAdvanceId) {
+      setSelectedPlayerId(askTargetId);
+      setGuessMode(false);
     }
-  }, [isMyTurnToAsk, askTargetId, isMyTurnToAnswer, askerId]);
+  }, [isMyTurnToAsk, askTargetId, isMyTurnToAnswer, askerId, pendingAdvanceId]);
+
+  // A new asker (new turn) starts fresh — no pending advance carries over.
+  useEffect(() => {
+    if (askerId !== currentPlayer.id) setPendingAdvanceId(null);
+  }, [askerId, currentPlayer.id]);
 
   type ConversationStatus = "asking" | "your-turn" | "waiting" | "solved";
   function conversationStatus(playerId: string): { label: string; tone: ConversationStatus } {
@@ -659,6 +739,12 @@ export function WhoAreYouRoomView({
     ? (conversationsByPlayer.get(selectedPlayerId) ?? [])
     : [];
   const canAskInSelectedChat = isMyTurnToAsk && askTargetId === selectedPlayerId;
+  // After asking (or guessing) an opponent and getting their answer back, the
+  // game state has already moved on to the next target — but we hold the UI
+  // on the finished chat and show "I'm Done" so the player paces the move
+  // themselves instead of the header jumping chats under them.
+  const advanceAfterAsk =
+    isMyTurnToAsk && !!pendingAdvanceId && !!askTargetId && askTargetId !== pendingAdvanceId;
   const canAnswerInSelectedChat =
     isMyTurnToAnswer && askerId === selectedPlayerId && !!activeQuestion;
   const selectedSolved =
@@ -684,6 +770,7 @@ export function WhoAreYouRoomView({
       if (isWhoAreYouTurnsState(payload.state)) setTurnState(payload.state);
       setQuestionDraft("");
       setGuessMode(false);
+      setPendingAdvanceId(askTargetId);
     } catch (err) {
       setAskError(err instanceof Error ? err.message : "Failed to ask.");
     } finally {
@@ -772,6 +859,7 @@ export function WhoAreYouRoomView({
       if (!response.ok) throw new Error(payload.error ?? "Failed to submit guess.");
       if (isWhoAreYouTurnsState(payload.state)) setTurnState(payload.state);
       setGuessMode(false);
+      setPendingAdvanceId(selectedPlayerId);
       if (payload.gameEnded) setEndedAt(new Date().toISOString());
     } catch (err) {
       setGuessError(err instanceof Error ? err.message : "Failed to submit guess.");
@@ -798,6 +886,15 @@ export function WhoAreYouRoomView({
     } finally {
       setEndGameSubmitting(false);
     }
+  }
+
+  // ---- top bar: "Leave Game" — non-host players only (the host sees "End
+  // Game" in this same slot instead, wired to endGame above). Purely
+  // client-side — just navigates the player back home; the disconnect
+  // itself is already handled by the same pagehide/visibility effects the
+  // platform core uses for any tab-close. --------------------------------
+  function handleLeaveGame() {
+    requestConfirm("Leave this game and go back home?", () => router.push("/"), "Leave Game");
   }
 
   async function handlePlayAgain() {
@@ -876,8 +973,16 @@ export function WhoAreYouRoomView({
 
   // ---- setup phase -------------------------------------------------------
   if (!turnState) {
+    const setupStatus = ownSelection
+      ? allPicked
+        ? beginTurnsBusy
+          ? "Everyone's picked — starting…"
+          : "Everyone's picked! Starting…"
+        : "Waiting for players to pick…"
+      : "Pick your character";
+
     return (
-      <div className="who-are-you-shell">
+      <div className="who-are-you-shell who-am-i-shell">
         <header className="who-am-i-topbar">
           <div className="who-am-i-topbar-left">
             <AvatarIcon
@@ -890,7 +995,27 @@ export function WhoAreYouRoomView({
               <span className="muted">Who Are You?</span>
             </div>
           </div>
+          <div className="who-am-i-topbar-center">
+            <span className="who-am-i-status-badge who-am-i-status-badge-waiting">
+              {setupStatus}
+            </span>
+          </div>
+          <div className="who-am-i-topbar-right">
+            <button
+              type="button"
+              className="who-am-i-btn-outline"
+              onClick={() => setHowToPlayOpen(true)}
+            >
+              How to Play
+            </button>
+          </div>
         </header>
+
+        <WhoAreYouHowToPlayModal
+          open={howToPlayOpen}
+          onClose={() => setHowToPlayOpen(false)}
+          description={gameConfig?.description}
+        />
 
         {ownSelection ? (
           <section className="who-are-you-waiting" aria-labelledby="who-are-you-waiting-heading">
@@ -898,9 +1023,9 @@ export function WhoAreYouRoomView({
               You picked {pickedCharacter?.name ?? "your character"}
             </h2>
             {pickedCharacter && (
-              <div className="who-are-you-picked-card">
+              <div className="who-are-you-picked-card" {...cardSoundHandlers(pickedCharacter.name)}>
                 <span className="who-am-i-card-image">
-                  <Image src={pickedCharacter.image_url} alt="" fill sizes="96px" />
+                  <Image src={pickedCharacter.image_url} alt="" fill sizes="96px" draggable={false} />
                 </span>
                 <span className="who-am-i-card-name">{pickedCharacter.name}</span>
               </div>
@@ -948,7 +1073,8 @@ export function WhoAreYouRoomView({
             )}
           </section>
         ) : (
-          <section className="who-are-you-picker" aria-labelledby="who-are-you-picker-heading">
+          <div className="who-am-i-layout who-am-i-layout-deck-only">
+          <section className="who-am-i-deck" aria-labelledby="who-are-you-picker-heading">
             <div className="who-am-i-deck-header">
               <div>
                 <h2 id="who-are-you-picker-heading">Pick your character</h2>
@@ -977,14 +1103,16 @@ export function WhoAreYouRoomView({
                     <li key={character.id}>
                       <button
                         type="button"
-                        className={`who-am-i-card${isSelected ? " selected" : ""}`}
-                        onClick={() => setSelectedCharacterId(character.id)}
-                        aria-pressed={isSelected}
-                        aria-label={`${character.name}${isSelected ? ", selected" : ", tap to select"}`}
+                        className={`who-am-i-card${isSelected ? " selected" : ""}`}          onClick={() => {
+            playCharacterSound(character.name);
+            setSelectedCharacterId(character.id);
+          }}
+          aria-pressed={isSelected}
+          aria-label={`${character.name}${isSelected ? ", selected" : ", tap to select"}`}
                         disabled={confirming}
                       >
                         <span className="who-am-i-card-image">
-                          <Image src={character.image_url} alt="" fill sizes="96px" />
+                          <Image src={character.image_url} alt="" fill sizes="96px" draggable={false} />
                         </span>
                         <span className="who-am-i-card-name">{character.name}</span>
                       </button>
@@ -1004,6 +1132,7 @@ export function WhoAreYouRoomView({
               </button>
             </div>
           </section>
+          </div>
         )}
       </div>
     );
@@ -1030,11 +1159,37 @@ export function WhoAreYouRoomView({
     <div className="who-are-you-shell who-am-i-shell">
       <header className="who-am-i-topbar">
         <div className="who-am-i-topbar-left">
-          <AvatarIcon
-            mushroomIndex={currentPlayer.mushroom_index}
-            accessoryIndex={currentPlayer.accessory_index}
-            size={40}
-          />
+          {/* Hover (desktop) or tap-and-hold (mobile) your own avatar to
+              peek at the character you picked — it cross-fades in over your
+              mushroom avatar and fades back when you stop. (Who Are You? is
+              the "you know your own character" game, so this is safe to
+              show.) Driven by :hover/:active in CSS — the no-op touch
+              handler below is invisible and just makes iOS Safari apply
+              :active while touching; no click affordance. */}
+          <div
+            className="who-am-i-avatar-reveal"
+            onTouchStart={() => {}}
+            title={pickedCharacter ? `You are ${pickedCharacter.name}` : undefined}
+          >
+            <span className="who-am-i-avatar-reveal-own">
+              <AvatarIcon
+                mushroomIndex={currentPlayer.mushroom_index}
+                accessoryIndex={currentPlayer.accessory_index}
+                size={40}
+              />
+            </span>
+            {pickedCharacter && (
+              <span className="who-am-i-avatar-reveal-character">
+                <Image
+                  src={pickedCharacter.image_url}
+                  alt=""
+                  fill
+                  sizes="40px"
+                  draggable={false}
+                />
+              </span>
+            )}
+          </div>
           <div className="who-am-i-topbar-left-info">
             <strong>{currentPlayer.nickname}</strong>
             <span className="muted">
@@ -1050,9 +1205,22 @@ export function WhoAreYouRoomView({
         </div>
         <div className="who-am-i-topbar-right">
           <button type="button" className="who-am-i-btn-outline" onClick={() => setHowToPlayOpen(true)}>
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M7.6 7.8a2.4 2.4 0 1 1 3.5 2.14c-.66.36-1.1.86-1.1 1.56v.3"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="10" cy="14.3" r="0.9" fill="currentColor" />
+            </svg>
             How to Play
           </button>
-          {currentPlayer.is_host && (
+          {/* Host gets "End Game" here instead of "Leave Game" — same slot
+              and design as Who Am I's header, so both games read identically. */}
+          {currentPlayer.is_host ? (
             <button
               type="button"
               className="who-am-i-btn-leave"
@@ -1061,7 +1229,36 @@ export function WhoAreYouRoomView({
                 requestConfirm("End the game for everyone?", () => void endGame(), "End Game")
               }
             >
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.6" />
+                <path
+                  d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
               {endGameSubmitting ? "Ending…" : "End Game"}
+            </button>
+          ) : (
+            <button type="button" className="who-am-i-btn-leave" onClick={handleLeaveGame}>
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                <path
+                  d="M8 4H4.75A.75.75 0 0 0 4 4.75v10.5c0 .414.336.75.75.75H8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M12.5 13.5 16 10l-3.5-3.5M16 10H8"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Leave Game
             </button>
           )}
         </div>
@@ -1072,32 +1269,11 @@ export function WhoAreYouRoomView({
         </p>
       )}
 
-      {howToPlayOpen && (
-        <div
-          className="who-am-i-modal-backdrop"
-          role="presentation"
-          onClick={() => setHowToPlayOpen(false)}
-        >
-          <div
-            className="who-am-i-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="who-are-you-howtoplay-heading"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="who-are-you-howtoplay-heading">How to Play</h2>
-            <p>{gameConfig?.description}</p>
-            <ul>
-              <li>Each opponent has their own board — cross-offs don&rsquo;t carry over.</li>
-              <li>On your turn, ask (or guess) each unsolved opponent once.</li>
-              <li>A correct guess solves that opponent only; a wrong guess wastes their slot this turn.</li>
-            </ul>
-            <button type="button" onClick={() => setHowToPlayOpen(false)}>
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
+      <WhoAreYouHowToPlayModal
+        open={howToPlayOpen}
+        onClose={() => setHowToPlayOpen(false)}
+        description={gameConfig?.description}
+      />
 
       {confirmDialog && (
         <div
@@ -1391,9 +1567,11 @@ export function WhoAreYouRoomView({
                     <p className="muted who-am-i-chat-composer-disabled">
                       {selectedSolved
                         ? `You've solved ${selectedPlayer.nickname}.`
-                        : isReviewingMyTurn
-                          ? "Review this turn's answers, then press “I'm Done.”"
-                          : `Waiting for your turn to chat with ${selectedPlayer.nickname}.`}
+                        : advanceAfterAsk
+                          ? `${pendingAdvanceId ? nicknameFor(pendingAdvanceId) : "They"} answered — press “I'm Done” to continue.`
+                          : isReviewingMyTurn
+                            ? "Review this turn's answers, then press “I'm Done.”"
+                            : `Waiting for your turn to chat with ${selectedPlayer.nickname}.`}
                     </p>
                   )}
                 </div>
@@ -1451,13 +1629,17 @@ export function WhoAreYouRoomView({
                     <li key={character.id}>
                       <button
                         type="button"
-                        className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                        onClick={() => !isCrossedOff && requestGuessForCharacter(character.id)}
-                        disabled={isCrossedOff || guessSubmitting}
-                        aria-label={`Guess ${character.name}`}
+                        className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}          onClick={() => {
+            if (!isCrossedOff) {
+              playCharacterSound(character.name);
+              requestGuessForCharacter(character.id);
+            }
+          }}
+          disabled={isCrossedOff || guessSubmitting}
+          aria-label={`Guess ${character.name}`}
                       >
                         <span className="who-am-i-card-image">
-                          <Image src={character.image_url} alt="" fill sizes="96px" />
+                          <Image src={character.image_url} alt="" fill sizes="96px" draggable={false} />
                         </span>
                         <span className="who-am-i-card-name">{character.name}</span>
                       </button>
@@ -1469,13 +1651,18 @@ export function WhoAreYouRoomView({
                     <button
                       type="button"
                       className={`who-am-i-card${isCrossedOff ? " crossed-off" : ""}`}
-                      onClick={() => !selectedSolved && toggleCharacter(character.id)}
-                      aria-pressed={isCrossedOff}
-                      aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
+          onClick={() => {
+            if (!selectedSolved) {
+              playCharacterSound(character.name);
+              toggleCharacter(character.id);
+            }
+          }}
+          aria-pressed={isCrossedOff}
+          aria-label={`${character.name}${isCrossedOff ? ", crossed off" : ", tap to cross off"}`}
                       disabled={selectedSolved}
                     >
                       <span className="who-am-i-card-image">
-                        <Image src={character.image_url} alt="" fill sizes="96px" />
+                        <Image src={character.image_url} alt="" fill sizes="96px" draggable={false} />
                       </span>
                       <span className="who-am-i-card-name">{character.name}</span>
                     </button>
@@ -1485,14 +1672,36 @@ export function WhoAreYouRoomView({
             </ul>
           </div>
 
-          {isReviewingMyTurn && (
+          {(isReviewingMyTurn || advanceAfterAsk) && (
             <div className="who-am-i-done-cta">
               {doneError && (
                 <p className="field-error" role="alert">
                   {doneError}
                 </p>
               )}
-              <button type="button" onClick={() => void submitDone()} disabled={endingTurn}>
+              {advanceAfterAsk && (
+                <p className="muted">
+                  {pendingAdvanceId
+                    ? `${nicknameFor(pendingAdvanceId)} answered — press “I'm Done” to move on.`
+                    : "Answered — press “I'm Done” to move on."}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (advanceAfterAsk) {
+                    // Pacing only: the game state already advanced. Move the
+                    // UI to the next ask target (the turn's real end still
+                    // goes through the reviewing-phase button below).
+                    if (askTargetId) setSelectedPlayerId(askTargetId);
+                    setGuessMode(false);
+                    setPendingAdvanceId(null);
+                  } else {
+                    void submitDone();
+                  }
+                }}
+                disabled={endingTurn}
+              >
                 {endingTurn ? "Ending turn…" : "I'm Done"}
               </button>
             </div>

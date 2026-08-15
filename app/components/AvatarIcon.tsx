@@ -33,6 +33,7 @@ export function AvatarIcon({
       <img
         src={mushroom.src}
         alt=""
+        draggable={false}
         className={wiggle ? "avatar-icon-layer avatar-wiggle-a" : "avatar-icon-layer"}
       />
       {accessory.src && (
@@ -40,6 +41,7 @@ export function AvatarIcon({
         <img
           src={accessory.src}
           alt=""
+          draggable={false}
           className={wiggle ? "avatar-icon-layer avatar-wiggle-b" : "avatar-icon-layer"}
         />
       )}

@@ -14,6 +14,7 @@
 // effects, gated on `endedAt`) rather than duplicated into this file.
 
 import Image from "next/image";
+import { cardSoundHandlers } from "@/lib/animalSounds";
 import type { WhoAmIGameMode } from "@/games/who-am-i/logic/turnState";
 
 export interface WhoAmIRecapEntry {
@@ -128,9 +129,9 @@ export function WhoAmIRecap({
                   <span className="who-am-i-recap-rank" aria-hidden="true">
                     #{entry.rank}
                   </span>
-                  <span className="who-am-i-recap-image">
+                  <span className="who-am-i-recap-image" {...cardSoundHandlers(entry.characterName)}>
                     {entry.characterImageUrl && (
-                      <Image src={entry.characterImageUrl} alt="" fill sizes="56px" />
+                      <Image src={entry.characterImageUrl} alt="" fill sizes="56px" draggable={false} />
                     )}
                   </span>
                   <span className="who-am-i-recap-info">
@@ -156,9 +157,9 @@ export function WhoAmIRecap({
               <ul className="who-am-i-recap-unsolved-list">
                 {unsolved.map((entry) => (
                   <li key={entry.playerId} className="who-am-i-recap-entry">
-                    <span className="who-am-i-recap-image">
+                    <span className="who-am-i-recap-image" {...cardSoundHandlers(entry.characterName)}>
                       {entry.characterImageUrl && (
-                        <Image src={entry.characterImageUrl} alt="" fill sizes="56px" />
+                        <Image src={entry.characterImageUrl} alt="" fill sizes="56px" draggable={false} />
                       )}
                     </span>
                     <span className="who-am-i-recap-info">
