@@ -26,9 +26,10 @@ export interface Room {
   host_player_id: string | null;
   /** Null until the host picks a game on /games — rooms are created as a
    * game-less shell (code + max players) and the game is assigned
-   * afterwards via the switch-game route (setRoomGame). Always set once
-   * anyone is in the waiting room, since join rejects game-less rooms and
-   * the game start routes refuse a mismatched/null game_id. */
+   * afterwards via the switch-game route (setRoomGame). Game-less rooms
+   * are joinable like any other (the joiner is redirected to
+   * /games?room=CODE — there's no room URL yet); the game start routes
+   * refuse a mismatched/null game_id. */
   game_id: string | null;
   status: RoomStatus;
   max_players: number | null;
@@ -348,7 +349,10 @@ export async function createRoom({
 export interface JoinRoomResult {
   roomId: string;
   code: string;
-  gameId: string;
+  /** null until the host picks a game (game-less shell room) — callers
+   * that redirect by this must send the joiner to /games?room=CODE instead
+   * of building a room URL when it's null. */
+  gameId: string | null;
   playerId: string;
   /** true if this session already had a player row (refresh / reconnect). */
   reconnected: boolean;
@@ -385,16 +389,10 @@ export async function joinRoomByCode(
     throw new RoomNotFoundError(`No room found for code "${normalizeRoomCode(code)}".`);
   }
 
-  // A game-less shell can't be joined yet — there's no /games/<game>/room/
-  // <code> URL to land on until the host picks a game (and JoinRoomResult
-  // .gameId, which the caller redirects by, would be null). The host can
-  // share the code right away; friends just have to try again once the
-  // game is chosen.
-  if (!room.game_id) {
-    throw new RoomError(
-      `Room "${normalizeRoomCode(code)}" hasn't picked a game yet — the host needs to choose one before anyone can join.`
-    );
-  }
+  // A game-less room joins exactly like a game-assigned one — all the
+  // checks below (reconnect, lobby status, room-full cap) are game-agnostic.
+  // The joiner just gets redirected to /games?room=CODE by their caller
+  // (JoinRoomResult.gameId is null) until the host picks a game.
 
   const { data: existing, error: existingError } = await supabase
     .from("players")

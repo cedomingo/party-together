@@ -708,6 +708,27 @@ button:disabled {
   font-family: var(--font-display);
 }
 
+/* /games page header row (app/components/GamesListing.tsx): the "Browse
+   Party Games" title with the copy-invite-link button pinned to the far
+   right — never inline after the room-info text below it. `margin-left:
+   auto` keeps the button right-aligned even when the row wraps. */
+.games-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.games-heading h1 {
+  margin: 0;
+}
+
+.games-heading-copy {
+  margin-left: auto;
+}
+
 .player-list {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -1672,13 +1693,41 @@ button:disabled {
 }
 
 /* "Who Are You?" character picker (WHO-ARE-YOU-SPEC.md §3) — the
-   selected-but-not-yet-locked-in state on a reused `.who-am-i-card`. Uses
-   --info (the same blue as links/the conversation-open indicator) rather
-   than --danger's crossed-off red, since selecting is a positive/neutral
-   action here, not an elimination. */
+   selected-but-not-yet-locked-in state on a reused `.who-am-i-card`.
+   Deliberately loud: this is the one spot on the picker where the player
+   must see their choice at a glance against the busy blueboard behind it
+   (the old faint blue ring blended into the background). Thick ink
+   border, mustard-tinted fill, a checkmark badge in the corner, and a
+   slight lift make the picked card read instantly — the mustard accent
+   matches the app's interactive-highlight color, not --danger's
+   elimination red. */
 .who-am-i-card.selected {
-  border-color: var(--info);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 35%, transparent);
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 22%, var(--card-surface));
+  border: 3px solid var(--ink);
+  box-shadow: 4px 5px 0 rgba(47, 42, 34, 0.28);
+  transform: translate(-1px, -2px);
+}
+
+.who-am-i-card.selected::after {
+  content: "✓";
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 1px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--accent);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 1px 2px 0 rgba(47, 42, 34, 0.28);
 }
 
 /* ---- "Who Are You?" — setup/picking phase only (Step 1) ---------------- */
@@ -1696,13 +1745,30 @@ button:disabled {
   margin: 0 auto;
 }
 
+/* The "You picked …" block (heading, character card, locked-in note) is
+   centered; the "Still picking" roster below it stays left-aligned. */
+.who-are-you-waiting h2 {
+  text-align: center;
+}
+
+.who-are-you-waiting > p.muted {
+  text-align: center;
+}
+
+/* Framed picked-character card — thick ink border matches the picker's
+   selected state so the locked-in choice reads as "chosen" here too. */
 .who-are-you-picked-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
   width: 140px;
-  margin: 0.75rem 0;
+  margin: 0.75rem auto;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem;
+  background: var(--card-surface);
+  box-shadow: 2px 3px 0 rgba(47, 42, 34, 0.18);
 }
 
 .who-are-you-picked-card .who-am-i-card-image {

@@ -42,7 +42,11 @@ export function JoinRoomForm({
     setError(null);
     try {
       const result = await joinRoomByCodeViaApi(code, nickname, mushroomIndex, accessoryIndex);
-      router.push(`/games/${result.gameId}/room/${result.code}`);
+      // A game-less room has no /games/<game>/room/<code> URL yet — send the
+      // joiner to the picker page with the room code instead, where they'll
+      // see the roster and wait with everyone else until the host picks a
+      // game (after which they land in the game's waiting room).
+      router.push(result.gameId ? `/games/${result.gameId}/room/${result.code}` : `/games?room=${result.code}`);
     } catch (err) {
       setError(err instanceof RoomError ? err.message : "Something went wrong joining the room.");
       setLoading(false);

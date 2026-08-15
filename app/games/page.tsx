@@ -37,13 +37,9 @@ export default async function GamesPage({
 
   return (
     <main className="page" id="main-content">
-      <h1>{roomCode ? `Choose a game for room ${roomCode}` : "Pick a game"}</h1>
-      <p className="lede">
-        {roomCode
-          ? "Pick a game to switch this room to — everyone keeps the same room code and lands back in the waiting room."
-          : "Browse the games below, then create a room from a game&rsquo;s page."}
-      </p>
-
+      {/* The page's <h1> lives inside GamesListing (app/components/
+          GamesListing.tsx) so the copy-invite-link button can sit on the
+          same row as the title, pinned to the far right. */}
       <GamesListing games={games.map(toGameSummary)} roomCode={roomCode} />
 
       {games.length === 0 && <p className="muted">No games are registered yet — nothing to play just yet.</p>}

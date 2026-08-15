@@ -32,7 +32,7 @@ import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
 import { getGameConfig, getGameRoomView } from "@/lib/games-registry";
 import { StatusScreen } from "@/app/components/StatusScreen";
 import { AvatarCreator } from "@/app/components/AvatarCreator";
-import { AvatarIcon } from "@/app/components/AvatarIcon";
+import { RoomRoster } from "@/app/components/RoomRoster";
 import { loadStoredAvatar, preloadAvatarAssets, saveStoredAvatar, type AvatarSelection } from "@/lib/avatar";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
@@ -432,29 +432,11 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
               </button>
             </header>
 
-            <section aria-labelledby="players-heading">
-              <h2 id="players-heading">Players ({players.length})</h2>
-              <ul className="player-list">
-                {players.map((p) => (
-                  <li key={p.id} className="player-row">
-                    <AvatarIcon
-                      mushroomIndex={p.mushroom_index}
-                      accessoryIndex={p.accessory_index}
-                      size={36}
-                      wiggle={false}
-                    />
-                    <span
-                      className={`status-dot ${onlineIds.has(p.id) || p.connected ? "online" : "offline"}`}
-                      aria-hidden="true"
-                    />
-                    <span>{p.nickname}</span>
-                    {p.is_host && <span className="badge">Host</span>}
-                    {p.id === currentPlayer.id && <span className="muted">(you)</span>}
-                    {!p.connected && !onlineIds.has(p.id) && <span className="muted">disconnected</span>}
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <RoomRoster
+              players={players}
+              onlineIds={onlineIds}
+              currentPlayerId={currentPlayer?.id ?? null}
+            />
           </>
         )}
 
