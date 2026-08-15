@@ -1566,6 +1566,85 @@ button:disabled {
   background: var(--online);
 }
 
+.who-are-you-lobby-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.who-are-you-lobby-options fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.who-are-you-lobby-options legend {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.who-are-you-conversation-solved {
+  opacity: 0.55;
+}
+
+.who-are-you-recap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 0 2rem;
+}
+
+.who-are-you-recap-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0;
+}
+
+.who-are-you-recap-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.who-are-you-recap-tab.selected {
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--info) 25%, transparent);
+}
+
+.who-are-you-recap-panel {
+  margin-top: 0.5rem;
+}
+
+.who-are-you-recap-player-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.who-are-you-recap-outcomes {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.who-are-you-recap-thread {
+  margin-bottom: 1.25rem;
+}
+
+.who-are-you-recap-thread h4 {
+  margin: 0 0 0.4rem;
+}
+
 /* "I'm Done" — centered below the table, once the asker has reviewed the
    turn's answers (moved down from the top bar per design spec). */
 .who-am-i-done-cta {

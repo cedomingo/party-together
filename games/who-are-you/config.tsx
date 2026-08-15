@@ -1,20 +1,29 @@
 // GameConfig for "Who Are You?" — see /lib/games-registry.ts for the shape
 // and how this gets wired into the platform.
 //
-// Step 1 (WHO-ARE-YOU-SPEC.md's build-prompt doc) only covers metadata plus
-// `onStart`: flipping the room into the setup/picking phase. No
-// `LobbyOptions` yet — the host-configurable game modes (WHO-ARE-YOU-
-// SPEC.md §8) are turn-loop concerns, deferred to Step 2, same as
-// games/who-am-i/config.tsx's "First One Out Wins?" checkbox was added
-// only once the turn loop existed.
-//
-// This module proves the exact same plugin pattern who-am-i did (SPEC.md
-// §3(B)/§12.8): a new folder under /games/, a new registry entry, no
-// changes to platform core.
+// Step 2 adds LobbyOptions for the host-configurable game modes
+// (WHO-ARE-YOU-SPEC.md §8): base-mode radio (Guess Everyone / Rival Match)
+// plus the independent "First Win Ends Game" checkbox.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { GameConfig } from "@/lib/games-registry";
+import type { GameConfig, GameLobbyOptionsProps } from "@/lib/games-registry";
 import type { Room } from "@/lib/rooms";
+import {
+  DEFAULT_BASE_MODE,
+  DEFAULT_FIRST_WIN_ENDS,
+  type WhoAreYouBaseMode,
+} from "@/games/who-are-you/logic/sessionState";
+
+/** Shape of this game's opaque `LobbyOptions`/`onStart` options value. */
+export interface WhoAreYouLobbyOptions {
+  baseMode: WhoAreYouBaseMode;
+  firstWinEnds: boolean;
+}
+
+const DEFAULT_LOBBY_OPTIONS: WhoAreYouLobbyOptions = {
+  baseMode: DEFAULT_BASE_MODE,
+  firstWinEnds: DEFAULT_FIRST_WIN_ENDS,
+};
 
 export const whoAreYouConfig: GameConfig = {
   id: "who-are-you",
@@ -23,28 +32,77 @@ export const whoAreYouConfig: GameConfig = {
     "Everyone secretly picks a character. Ask yes/no questions to figure out who everyone else picked — before they figure out you.",
   minPlayers: 3,
   maxPlayers: 12,
-  // Reuses Who Am I's thumbnail placeholder for now (WHO-ARE-YOU-SPEC.md
-  // §2: same 25-character roster/art, no new asset work needed yet).
   thumbnailPath: "/characters/who-am-i/thumbnail.png",
   onStart: startWhoAreYouGame,
+  LobbyOptions: WhoAreYouLobbyOptions,
+  defaultLobbyOptions: DEFAULT_LOBBY_OPTIONS,
 };
 
 /**
- * Flips the room into the setup/picking phase (WHO-ARE-YOU-SPEC.md §3
- * point 1) — and only that. Unlike who-am-i's `onStart`, this does NOT
- * assign anything to anyone: each player's own pick is a player-initiated
- * write against `who_are_you_selections` made from RoomView itself, once
- * they land on the character picker (see WHO-ARE-YOU-SPEC.md §3 point 5 —
- * "not something assigned by the host/server like Who Am I's random
- * assignment"). This just creates the session (turnOrder fixed now, state
- * "setup") and marks the room in_progress, via
- * app/api/games/who-are-you/start/route.ts.
+ * Host-only lobby controls (WHO-ARE-YOU-SPEC.md §8):
+ *   - Base mode radio: Guess Everyone (default) vs Rival Match
+ *   - Independent "First Win Ends Game" checkbox layered on either
  */
-async function startWhoAreYouGame(_supabase: SupabaseClient, room: Room): Promise<void> {
+function WhoAreYouLobbyOptions({ value, onChange }: GameLobbyOptionsProps) {
+  const options = (value as WhoAreYouLobbyOptions | undefined) ?? DEFAULT_LOBBY_OPTIONS;
+
+  return (
+    <div className="who-are-you-lobby-options">
+      <fieldset className="field">
+        <legend>Win condition</legend>
+        <label className="field field-checkbox">
+          <input
+            type="radio"
+            name="who-are-you-base-mode"
+            checked={options.baseMode === "guess-everyone"}
+            onChange={() =>
+              onChange({ ...options, baseMode: "guess-everyone" } satisfies WhoAreYouLobbyOptions)
+            }
+          />
+          <span>Guess Everyone</span>
+          <span className="muted"> — correctly guess every other player</span>
+        </label>
+        <label className="field field-checkbox">
+          <input
+            type="radio"
+            name="who-are-you-base-mode"
+            checked={options.baseMode === "rival-match"}
+            onChange={() =>
+              onChange({ ...options, baseMode: "rival-match" } satisfies WhoAreYouLobbyOptions)
+            }
+          />
+          <span>Rival Match</span>
+          <span className="muted"> — only your assigned rival counts toward a win</span>
+        </label>
+      </fieldset>
+      <label className="field field-checkbox">
+        <input
+          type="checkbox"
+          checked={options.firstWinEnds}
+          onChange={(e) =>
+            onChange({
+              ...options,
+              firstWinEnds: e.target.checked,
+            } satisfies WhoAreYouLobbyOptions)
+          }
+        />
+        <span>First Win Ends Game</span>
+        <span className="muted"> — off: play out the base mode&rsquo;s natural end</span>
+      </label>
+    </div>
+  );
+}
+
+async function startWhoAreYouGame(_supabase: SupabaseClient, room: Room, options: unknown): Promise<void> {
+  const lobby = (options as WhoAreYouLobbyOptions | undefined) ?? DEFAULT_LOBBY_OPTIONS;
   const response = await fetch("/api/games/who-are-you/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomId: room.id }),
+    body: JSON.stringify({
+      roomId: room.id,
+      baseMode: lobby.baseMode,
+      firstWinEnds: lobby.firstWinEnds,
+    }),
   });
 
   if (!response.ok) {

@@ -1,65 +1,96 @@
-// Pure session-state shape for "Who Are You?" (WHO-ARE-YOU-SPEC.md §3, §6).
-// No React, no I/O, no Supabase import — same rationale as
-// games/who-am-i/logic/turnState.ts: this is the one shared definition of
-// what `game_sessions.state jsonb` looks like for this game, read by both
-// the start route (which creates it) and RoomView (which reads it).
+// Pure session-state shape for "Who Are You?" (WHO-ARE-YOU-SPEC.md §3, §6, §8).
+// No React, no I/O — shared by the start route, begin-turns route, and RoomView.
 //
-// Step 1 only ever produces phase "setup" — every player independently
-// picking a character, with no turn loop yet (WHO-ARE-YOU-SPEC.md's Step 1
-// build prompt: "this step stops right where gameplay would begin"). "turns"
-// is listed here already so Step 2 (turn loop, per-opponent boards,
-// guessing — WHO-ARE-YOU-SPEC.md §4-§9) can extend this same state shape
-// in place rather than replacing it, and so `who_are_you_selections`'s
-// insert RLS policy (which checks `state->>'phase' = 'setup'`, see
-// supabase/migrations/20260811000000_who_are_you_setup.sql) has a real
-// "not setup anymore" value to eventually compare against. Nothing in this
-// file yet builds or transitions into "turns" — that arrives with Step 2.
+// Step 1 only ever produced phase "setup". Step 2 extends this same state
+// shape: lobby-configurable modes live on both phases, and once every
+// player has picked, begin-turns flips phase to "turns" and nests the
+// full turn-loop fields (see turnState.ts).
+
 export type WhoAreYouPhase = "setup" | "turns";
 
-export interface WhoAreYouSessionState {
-  phase: WhoAreYouPhase;
+/**
+ * Base win-condition mode (WHO-ARE-YOU-SPEC.md §8):
+ *   - "guess-everyone" (default): correctly guess every other player;
+ *     natural end is last-standing-loses unless firstWinEnds is on.
+ *   - "rival-match": only guessing your assigned rival counts toward a win;
+ *     natural end is every rival matchup resolved.
+ */
+export type WhoAreYouBaseMode = "guess-everyone" | "rival-match";
+
+export const DEFAULT_BASE_MODE: WhoAreYouBaseMode = "guess-everyone";
+export const DEFAULT_FIRST_WIN_ENDS = false;
+
+export interface WhoAreYouSetupState {
+  phase: "setup";
   /**
    * Player ids, fixed for the whole session, established at game start —
-   * same join-order convention as who-am-i's `turnOrder`
-   * (games/who-am-i/logic/turnState.ts). Not used for anything yet in Step
-   * 1 (there's no turn loop to order), but fixing it now, at start, means
-   * Step 2 doesn't need a second "who was in the room when we started"
-   * write later — and matches how who-am-i already establishes turnOrder
-   * once, at the same moment the session is created.
+   * same join-order convention as who-am-i's `turnOrder`.
    */
   turnOrder: string[];
+  baseMode: WhoAreYouBaseMode;
+  /** Independent checkbox layered on either base mode (§8). */
+  firstWinEnds: boolean;
 }
 
 export class SessionStateError extends Error {}
 
 /**
  * The state a freshly-started "Who Are You?" session begins in: every
- * player in `turnOrder` still needs to pick (WHO-ARE-YOU-SPEC.md §3 points
- * 1-2), nobody has yet.
+ * player in `turnOrder` still needs to pick (WHO-ARE-YOU-SPEC.md §3).
  */
-export function initialWhoAreYouState(turnOrder: readonly string[]): WhoAreYouSessionState {
+export function initialWhoAreYouState(
+  turnOrder: readonly string[],
+  baseMode: WhoAreYouBaseMode = DEFAULT_BASE_MODE,
+  firstWinEnds: boolean = DEFAULT_FIRST_WIN_ENDS
+): WhoAreYouSetupState {
   if (turnOrder.length === 0) {
     throw new SessionStateError("Cannot start a session with no players.");
   }
   return {
     phase: "setup",
     turnOrder: [...turnOrder],
+    baseMode,
+    firstWinEnds,
   };
 }
 
+export function isWhoAreYouSetupState(value: unknown): value is WhoAreYouSetupState {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  if (v.phase !== "setup") return false;
+  if (!Array.isArray(v.turnOrder) || !v.turnOrder.every((id) => typeof id === "string")) {
+    return false;
+  }
+  // Step 1 sessions may lack baseMode/firstWinEnds — normalize in place so
+  // readers always see a complete setup state.
+  if (v.baseMode !== "guess-everyone" && v.baseMode !== "rival-match") {
+    (v as { baseMode: WhoAreYouBaseMode }).baseMode = DEFAULT_BASE_MODE;
+  }
+  if (typeof v.firstWinEnds !== "boolean") {
+    (v as { firstWinEnds: boolean }).firstWinEnds = DEFAULT_FIRST_WIN_ENDS;
+  }
+  return true;
+}
+
 /**
- * Type guard + shape check for whatever comes back out of
- * `game_sessions.state`. That column defaults to `{}` (see
- * supabase/migrations/..._game_tables.sql), so any reader has to handle
- * "not initialized yet" as a distinct case from "malformed" — mirrors
- * `isWhoAmITurnState` in games/who-am-i/logic/turnState.ts.
+ * Broad type guard for whatever comes back out of `game_sessions.state`
+ * during either phase. Prefer `isWhoAreYouSetupState` /
+ * `isWhoAreYouTurnsState` when you need phase-specific fields.
  */
+export type WhoAreYouSessionState = WhoAreYouSetupState | import("./turnState").WhoAreYouTurnsState;
+
 export function isWhoAreYouSessionState(value: unknown): value is WhoAreYouSessionState {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return (
-    (v.phase === "setup" || v.phase === "turns") &&
-    Array.isArray(v.turnOrder) &&
-    v.turnOrder.every((id) => typeof id === "string")
-  );
+  if (v.phase === "setup") return isWhoAreYouSetupState(value);
+  if (v.phase === "turns") {
+    // Lightweight shape check — turnState.isWhoAreYouTurnsState is canonical
+    // for the full turns payload.
+    return (
+      Array.isArray(v.turnOrder) &&
+      (v.baseMode === "guess-everyone" || v.baseMode === "rival-match") &&
+      typeof v.firstWinEnds === "boolean"
+    );
+  }
+  return false;
 }
