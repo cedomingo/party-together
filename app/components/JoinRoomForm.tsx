@@ -17,15 +17,11 @@ export function JoinRoomForm({
   nickname,
   mushroomIndex,
   accessoryIndex,
-  avatarAssetsReady = true,
 }: {
   fixedCode?: string;
   nickname: string;
   mushroomIndex: number;
   accessoryIndex: number;
-  /** False while avatar images are still preloading — see RoomForms.tsx.
-   * Held true by default so callers that don't preload keep working. */
-  avatarAssetsReady?: boolean;
 }) {
   const router = useRouter();
   const [code, setCode] = useState(fixedCode ?? "");
@@ -77,8 +73,14 @@ export function JoinRoomForm({
         </p>
       )}
 
-      <button type="submit" disabled={loading || !avatarAssetsReady}>
-        {loading ? "Joining…" : avatarAssetsReady ? "Join a room" : "Loading avatar…"}
+      {/* Deliberately NOT gated on avatar-image preloading: the avatar
+          indices are already known (localStorage/defaults) and nothing
+          about joining needs the PNGs — the ~29 MB preload only feeds the
+          preview. Blocking the CTA on it made create/join feel dead for
+          seconds on slow connections. The preview still shows its skeleton
+          until assets arrive (AvatarCreator's assetsReady). */}
+      <button type="submit" disabled={loading}>
+        {loading ? "Joining…" : "Join a room"}
       </button>
     </form>
   );

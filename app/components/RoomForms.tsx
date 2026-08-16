@@ -78,7 +78,6 @@ export function RoomForms({
             nickname={avatar.name}
             mushroomIndex={avatar.mushroomIndex}
             accessoryIndex={avatar.accessoryIndex}
-            avatarAssetsReady={avatarAssetsReady}
           />
         ) : (
           fixedGameId && (
@@ -87,7 +86,6 @@ export function RoomForms({
               nickname={avatar.name}
               mushroomIndex={avatar.mushroomIndex}
               accessoryIndex={avatar.accessoryIndex}
-              avatarAssetsReady={avatarAssetsReady}
             />
           )
         )}
@@ -95,7 +93,6 @@ export function RoomForms({
           nickname={avatar.name}
           mushroomIndex={avatar.mushroomIndex}
           accessoryIndex={avatar.accessoryIndex}
-          avatarAssetsReady={avatarAssetsReady}
         />
       </div>
     </>

@@ -282,26 +282,22 @@ a {
   }
 }
 
-/* Illustrated-paper card: cream surface, thick hand-inked outline, and a
-   colored "banner strip" along the top edge (art direction: "occasional
-   colored header/banner strips"). Defaults to mustard; the join form
-   sitting next to it on the homepage gets its own olive strip below so
-   the two don't read as identical twins. */
+/* Illustrated-paper card: cream surface framed by a hand-drawn border
+   (public/ui/avatar/elements/border5.png, drawn to stretch with
+   background-size) instead of a plain CSS outline — the frame's irregular
+   scribble corners are the point, so no border-radius here (clipping
+   would shave them off). */
 .panel-form {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  background: var(--paper);
-  border: 2.5px solid var(--border);
-  border-top-width: 8px;
-  border-top-color: var(--accent);
-  border-radius: var(--radius-lg);
+  background-color: var(--paper);
+  border: none;
+  background-image: url("/ui/avatar/elements/border5.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
   padding: 1.5rem 1.4rem;
-}
-
-.two-up .panel-form:last-child {
-  border-top-color: var(--secondary);
 }
 
 .panel-form h2 {
@@ -457,19 +453,20 @@ button:disabled {
 /* -----------------------------------------------------------------------
    Avatar creator — sits above the Create/Join two-up on the home page and
    every per-game landing page (app/components/RoomForms.tsx). Same paper
-   card language as .panel-form (hand-inked border, banner strip) so it
-   reads as part of the family rather than a bolted-on widget.
+   card language as .panel-form (hand-drawn border5 frame instead of a CSS
+   outline) so it reads as part of the family rather than a bolted-on
+   widget.
    ----------------------------------------------------------------------- */
 .avatar-creator {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.9rem;
-  background: var(--paper);
-  border: 2.5px solid var(--border);
-  border-top-width: 8px;
-  border-top-color: var(--special);
-  border-radius: var(--radius-lg);
+  background-color: var(--paper);
+  border: none;
+  background-image: url("/ui/avatar/elements/border5.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
   padding: 1.5rem 1.4rem;
   margin-top: 1.5rem;

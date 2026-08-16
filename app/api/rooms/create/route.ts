@@ -50,21 +50,33 @@ export async function POST(request: Request) {
       : null;
 
   try {
-    await enforceRateLimit({
+    const supabase = await createSupabaseServerClient();
+
+    // The rate-limit check (admin-client RPC) is independent of the room
+    // creation work (user-client session + inserts), so run them
+    // concurrently instead of stacking two network round trips. If the
+    // limit trips, the RateLimitError below is still returned to the
+    // client; the room row that may have been created meanwhile is cheap
+    // and expires via the cleanup cron, so the overlap is a fair trade
+    // for shaving a round trip off every create.
+    const rateLimit = enforceRateLimit({
       key: `room-create:${getClientIp(request)}`,
       limit: LIMIT,
       windowSeconds: WINDOW_SECONDS,
     });
 
-    const supabase = await createSupabaseServerClient();
-    const result = await createRoom({
-      supabase,
-      gameId: typeof gameId === "string" && gameId.length > 0 ? gameId : undefined,
-      nickname,
-      maxPlayers: parsedMaxPlayers,
-      mushroomIndex: typeof mushroomIndex === "number" ? mushroomIndex : undefined,
-      accessoryIndex: typeof accessoryIndex === "number" ? accessoryIndex : undefined,
-    });
+    const result = await Promise.all([
+      rateLimit,
+      createRoom({
+        supabase,
+        gameId: typeof gameId === "string" && gameId.length > 0 ? gameId : undefined,
+        nickname,
+        maxPlayers: parsedMaxPlayers,
+        mushroomIndex: typeof mushroomIndex === "number" ? mushroomIndex : undefined,
+        accessoryIndex: typeof accessoryIndex === "number" ? accessoryIndex : undefined,
+      }),
+    ]).then(([, roomResult]) => roomResult);
+
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof RateLimitError) {

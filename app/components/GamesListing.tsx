@@ -405,8 +405,11 @@ export function GamesListing({
                         {joinError}
                       </p>
                     )}
-                    <button type="submit" disabled={joining || !joinAvatar.name.trim() || !avatarAssetsReady}>
-                      {joining ? "Joining…" : avatarAssetsReady ? "Join room" : "Loading avatar…"}
+                    {/* Not gated on avatar preload — the indices are known
+                        already; the ~29 MB image preload only feeds the
+                        preview skeleton. See RoomForms.tsx. */}
+                    <button type="submit" disabled={joining || !joinAvatar.name.trim()}>
+                      {joining ? "Joining…" : "Join room"}
                     </button>
                   </form>
                 </>

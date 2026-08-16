@@ -232,21 +232,11 @@ export async function createRoom({
   mushroomIndex,
   accessoryIndex,
 }: CreateRoomParams): Promise<CreateRoomResult> {
-  await ensureAnonSession(supabase);
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new AuthSessionError(userError?.message ?? "No authenticated user.");
-  }
-
-  console.log("[DEBUG createRoom]", {
-    userId: user?.id,
-    error: userError?.message,
-  });
+  // ensureAnonSession already resolves (or mints) the anonymous session and
+  // returns its user id — a second getUser() here was a redundant network
+  // round trip on every create, which is exactly the kind of latency that
+  // makes the create click feel unresponsive.
+  const userId = await ensureAnonSession(supabase);
 
   const cleanNickname = sanitizeNickname(nickname);
 
@@ -286,28 +276,11 @@ export async function createRoom({
     );
   }
 
-  // TEMPORARY DIAGNOSTIC — remove once auth.uid() is confirmed working.
-  const { data: authDebug, error: authDebugError } = await supabase.rpc("debug_auth");
-  console.log("[DEBUG createRoom] auth.uid() as seen by Postgres:", authDebug, authDebugError);
-
-  // TEMPORARY DIAGNOSTIC — remove once the players-insert RLS policy is
-  // confirmed working. `full_with_check` is the answer: if it comes back
-  // `true` but the insert below still fails, the bug isn't in this
-  // policy's logic at all (something stranger — worth capturing the raw
-  // Postgres error `code`, not just the message, at that point). If it
-  // comes back `false`, whichever of `auth_id_matches` / `status_is_lobby`
-  // / `under_cap` is false tells us exactly where.
-  const { data: checkDebug, error: checkDebugError } = await supabase.rpc("debug_insert_check", {
-    target_room_id: room.id,
-    candidate_auth_id: user.id,
-  });
-  console.log("[DEBUG createRoom] insert-check breakdown:", checkDebug, checkDebugError);
-
   const { data: playerRow, error: playerError } = await supabase
     .from("players")
     .insert({
       room_id: room.id,
-      auth_id: user.id,
+      auth_id: userId,
       nickname: cleanNickname,
       is_host: true,
       mushroom_index: clampAvatarIndex(mushroomIndex, MUSHROOMS.length),
@@ -315,14 +288,6 @@ export async function createRoom({
     })
     .select()
     .single();
-
-  console.log("[DEBUG createRoom] player insert result", {
-    success: !!playerRow,
-    code: playerError?.code,
-    message: playerError?.message,
-    details: playerError?.details,
-    hint: playerError?.hint,
-  });
 
   if (playerError || !playerRow) {
     throw new RoomError(playerError?.message ?? "Failed to create the host's player row.");
