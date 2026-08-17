@@ -29,7 +29,7 @@ export const whoAreYouConfig: GameConfig = {
   id: "who-are-you",
   displayName: "Who Are You?",
   description:
-    "Everyone secretly picks a character. Ask yes/no questions to figure out who everyone else picked — before they figure out you.",
+    "Everyone secretly picks a character. Ask yes/no questions to figure out who everyone else picked.",
   minPlayers: 2,
   maxPlayers: 12,
   thumbnailPath: "/ui/gamecovers/who-are-you.png",
