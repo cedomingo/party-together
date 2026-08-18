@@ -1,7 +1,7 @@
 "use client";
 
 // Platform-core "Create Room" form (SPEC.md §7). Game-agnostic: it creates
-// a room for the single game it's told about via `fixedGameId` — currently
+// a room for the single game it's told about via `fixedGameId` - currently
 // only the per-game landing pages at /games/<id> render it, where the game
 // is fixed by the page itself. Choosing a game is otherwise done on the
 // /games page (app/components/GamePicker.tsx + GamesListing.tsx): either by
@@ -9,7 +9,7 @@
 // and picking there, or from the /games?room=CODE swap flow.
 //
 // `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
-// via RoomForms.tsx) rather than a field of its own — there used to be a
+// via RoomForms.tsx) rather than a field of its own - there used to be a
 // second "Your nickname" input here, but the avatar creator above already
 // asks for a name once, and everything on this page shares it.
 
@@ -24,7 +24,7 @@ export function CreateRoomForm({
   mushroomIndex,
   accessoryIndex,
 }: {
-  /** The game this form creates a room for — fixed by the page that renders it. */
+  /** The game this form creates a room for - fixed by the page that renders it. */
   fixedGameId: string;
   nickname: string;
   mushroomIndex: number;
@@ -82,7 +82,7 @@ export function CreateRoomForm({
 
       {/* Deliberately NOT gated on avatar-image preloading: the avatar
           indices are already known (localStorage/defaults) and nothing
-          about creation needs the PNGs — the ~29 MB preload only feeds the
+          about creation needs the PNGs - the ~29 MB preload only feeds the
           preview. Blocking the CTA on it made create/join feel dead for
           seconds on slow connections. The preview still shows its skeleton
           until assets arrive (AvatarCreator's assetsReady). */}

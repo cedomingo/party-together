@@ -1,7 +1,7 @@
 // Stale-player lobby sweep endpoint. Room pages call this periodically while
 // the room is in the lobby (see LOBBY_SWEEP_INTERVAL_MS in lib/rooms and the
-// sweep effects in RoomClient/GamesListing) so the roster — and the host's
-// player-count gate — reflects only players who are actually here, without
+// sweep effects in RoomClient/GamesListing) so the roster - and the host's
+// player-count gate - reflects only players who are actually here, without
 // waiting for a reload. The deletes go through the admin client because RLS
 // deliberately only lets a player delete their own row (players_delete_self);
 // the same sweep runs authoritatively inside the game-start routes, so a
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not signed in." }, { status: 401 });
     }
 
-    // RLS-scoped read (rooms_select_any_authenticated) — any signed-in
+    // RLS-scoped read (rooms_select_any_authenticated) - any signed-in
     // session can read room metadata; the membership check below is the
     // actual gate.
     const { data: room, error: roomError } = await supabase
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, removed: [] });
     }
 
-    // Only room members may sweep — RLS-scoped read of the caller's own row.
+    // Only room members may sweep - RLS-scoped read of the caller's own row.
     const { data: memberRow, error: memberError } = await supabase
       .from("players")
       .select("id")
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const removed = await sweepStalePlayers(createSupabaseAdminClient(), roomId);
     return NextResponse.json({ ok: true, removed });
   } catch (err) {
-    // players.last_seen_at doesn't exist yet (migration not applied) —
+    // players.last_seen_at doesn't exist yet (migration not applied) -
     // nothing to sweep, so behave as a no-op instead of erroring every
     // minute from every room page.
     if (err instanceof RoomError && (err as RoomError & { code?: string }).code === "42703") {

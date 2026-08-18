@@ -9,8 +9,8 @@
 -- Nothing references rooms.game_id via FK, and all per-game data hangs off
 -- game_sessions.session_id (keyed to the room), so a null/updated game_id
 -- never orphans anything. The join flow rejects game-less rooms with a
--- friendly error (lib/rooms joinRoomByCode) — there's no room URL to land
--- on until a game is picked — and the game start routes already refuse
+-- friendly error (lib/rooms joinRoomByCode) - there's no room URL to land
+-- on until a game is picked - and the game start routes already refuse
 -- anything that isn't their own game_id.
 -- ---------------------------------------------------------------------------
 alter table public.rooms

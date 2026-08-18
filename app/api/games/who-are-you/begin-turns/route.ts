@@ -5,7 +5,7 @@
 // the current state without rewriting boards.
 //
 // Board inserts need the service-role client (no authenticated INSERT
-// policy on who_are_you_boards — see 20260815000000_who_are_you_boards.sql).
+// policy on who_are_you_boards - see 20260815000000_who_are_you_boards.sql).
 // The session-state update uses the caller's own client
 // (game_sessions_update_room_members).
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You're not a member of this room." }, { status: 403 });
   }
 
-  // Already in turns — idempotent success (another client won the race).
+  // Already in turns - idempotent success (another client won the race).
   if (isWhoAreYouTurnsState(session.state)) {
     return NextResponse.json({ state: session.state as WhoAreYouTurnsState, alreadyStarted: true });
   }
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
   const supabaseAdmin = createSupabaseAdminClient();
   const { error: boardsError } = await supabaseAdmin.from("who_are_you_boards").insert(boardRows);
   if (boardsError) {
-    // Unique violation = another concurrent begin-turns already inserted —
+    // Unique violation = another concurrent begin-turns already inserted -
     // keep going and try to flip state.
     if (boardsError.code !== "23505") {
       return NextResponse.json({ error: boardsError.message }, { status: 500 });

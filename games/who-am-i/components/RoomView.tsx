@@ -1,11 +1,11 @@
 "use client";
 
-// "Who Am I?" in-room view — Setup & Board (SPEC.md §8 "Setup") plus the
+// "Who Am I?" in-room view - Setup & Board (SPEC.md §8 "Setup") plus the
 // Turn Loop & Question Log (SPEC.md §8 "Turn Loop", §5 questions_log).
 // This is what the platform core (RoomClient) hands rendering off to once a
-// room's status is "in_progress" and its game_id resolves to "who-am-i" —
+// room's status is "in_progress" and its game_id resolves to "who-am-i" -
 // see /lib/games-registry.ts's `getGameRoomView`. Character assignment
-// (and turn order — see games/who-am-i/logic/turnState.ts) already happened
+// (and turn order - see games/who-am-i/logic/turnState.ts) already happened
 // before the room ever reached this status (see GameConfig.onStart in
 // ../config.ts + app/api/games/who-am-i/start), so this component's job is:
 // load the roster + caller's own board, load the session's turn state and
@@ -15,22 +15,22 @@
 //
 // Phase 6a shipped the ask/answer/done loop only (guessing, "solved"
 // state, the game-end condition, and the recap screen were deliberately
-// left out — see that phase's comment, now superseded). Phase 6b adds the
+// left out - see that phase's comment, now superseded). Phase 6b adds the
 // rest of SPEC.md §8 points 6-7 on the frontend: a guess-your-identity
 // control (backed by app/api/games/who-am-i/guess/route.ts), a host-only
-// "End Game" control (app/api/games/who-am-i/end/route.ts), and — once
-// `game_sessions.ended_at` is set, by either path — handing rendering off
+// "End Game" control (app/api/games/who-am-i/end/route.ts), and - once
+// `game_sessions.ended_at` is set, by either path - handing rendering off
 // entirely to <WhoAmIRecap> instead of the turn loop / board. See
 // ../logic/turnState.ts for the `solvedPlayerIds` / phase rules those
 // controls are constrained by.
 //
-// The "can never see my own character" rule isn't re-implemented here —
+// The "can never see my own character" rule isn't re-implemented here -
 // it's already enforced upstream, at the RLS/query level, by the
 // `who_am_i_board` view (supabase/migrations/
 // ..._who_am_i_identity_protection.sql): that view always nulls out
 // character_id for the caller's own row, and there is no SELECT grant on
 // the underlying who_am_i_assignments table at all, so there is no query
-// this component could run — buggy or not — that would ever return the
+// this component could run - buggy or not - that would ever return the
 // caller's own character_id. This component just never asks for it: the
 // board only needs `crossed_off_character_ids` from that row, never
 // `character_id`.
@@ -41,17 +41,17 @@
 // broadcastEvents.ts) for the low-latency, ephemeral events SPEC.md §9
 // calls out: the active-turn indicator, "player is typing a question,"
 // sequential answer prompts, and "I'm Done" events. Postgres remains the
-// source of truth either way — the Broadcast channel only ever pushes
+// source of truth either way - the Broadcast channel only ever pushes
 // forward a state update the postgres_changes subscription would also
 // deliver a moment later (or, for typing, something that was never meant
 // to be persisted at all). A page refresh mid-game never touches
-// Broadcast or Presence — the initial-load effect below reads `state`,
+// Broadcast or Presence - the initial-load effect below reads `state`,
 // `questions_log`, and this player's own board row straight from
 // Postgres, so rehydration is correct with or without either channel.
 //
 // Presence (SPEC.md §9's "which players are currently connected") is
 // tracked once, centrally, by RoomClient's `room-presence:<room.id>`
-// channel and passed down as the `onlineIds` prop — this component reads
+// channel and passed down as the `onlineIds` prop - this component reads
 // it to flag when whoever's up next appears to be offline, but never
 // opens its own Presence subscription.
 
@@ -93,11 +93,11 @@ interface OwnBoardRow {
  * Shape of a `who_am_i_board` row fetched for the WHOLE session (every
  * player, not just the caller's own row) during an in-progress game. The
  * view (supabase/migrations/..._who_am_i_identity_protection.sql) only
- * ever nulls out `character_id` for the row belonging to the CALLER —
+ * ever nulls out `character_id` for the row belonging to the CALLER -
  * every other player's row already comes back with their real
  * character_id, live, for the whole session. This is exactly SPEC.md §7's
  * "each player is secretly assigned a character identity that only
- * *other* players can see" — this component just wasn't reading it before.
+ * *other* players can see" - this component just wasn't reading it before.
  */
 interface OpponentBoardRow {
   session_id: string;
@@ -118,11 +118,11 @@ interface QuestionLogRow {
   answers: Record<string, AnswerValue>;
   resolved: boolean;
   /** True when this entry records a guess rather than an asked question
-   * (SPEC.md §8 point 6 — guessing counts as a turn action, logged the
+   * (SPEC.md §8 point 6 - guessing counts as a turn action, logged the
    * same way a question is). See supabase/migrations/
    * ..._who_am_i_guess_log_and_free_text_answers.sql. */
   is_guess: boolean;
-  /** Only set when is_guess is true — the character the guesser picked. */
+  /** Only set when is_guess is true - the character the guesser picked. */
   guessed_character_id: string | null;
 }
 
@@ -133,7 +133,7 @@ function formatAnswer(value: AnswerValue): string {
 }
 
 /**
- * Shape of a `who_am_i_board` row once `game_sessions.ended_at` is set —
+ * Shape of a `who_am_i_board` row once `game_sessions.ended_at` is set -
  * that's the only condition under which the view's `character_id` case
  * (supabase/migrations/..._who_am_i_recap_reveal.sql) stops nulling out
  * the caller's own row, so this is only ever fetched for the recap, never
@@ -184,7 +184,7 @@ export function WhoAmIRoomView({
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [crossedOff, setCrossedOff] = useState<Set<string>>(new Set());
-  // Every OTHER player's live character assignment (SPEC.md §7 — see
+  // Every OTHER player's live character assignment (SPEC.md §7 - see
   // OpponentBoardRow above). Keyed by player_id; the caller's own id will
   // simply be absent/null since who_am_i_board nulls that row out.
   const [opponentCharacterByPlayer, setOpponentCharacterByPlayer] = useState<
@@ -213,7 +213,7 @@ export function WhoAmIRoomView({
   const [endGameError, setEndGameError] = useState<string | null>(null);
 
   // ---- recap: host "Play Again" (sends the room back to the lobby so
-  // players can be invited again — see handlePlayAgain below) -------------
+  // players can be invited again - see handlePlayAgain below) -------------
   const [playAgainSubmitting, setPlayAgainSubmitting] = useState(false);
   const [playAgainError, setPlayAgainError] = useState<string | null>(null);
 
@@ -224,13 +224,13 @@ export function WhoAmIRoomView({
 
   // ---- messaging-app-style UI: which conversation is open, and whether
   // the deck is currently in "tap a card to guess" mode (replaces the old
-  // guess <select> — SPEC.md restructure request) --------------------------
+  // guess <select> - SPEC.md restructure request) --------------------------
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [guessMode, setGuessMode] = useState(false);
 
   // ---- recap (SPEC.md §8 point 7) ----------------------------------------
   // Set from `game_sessions.ended_at`, either on initial load or via the
-  // realtime subscription below — whichever end path fired
+  // realtime subscription below - whichever end path fired
   // (system-detected "all solved" in guess/route.ts, or a host manually
   // ending it in end/route.ts), this is the single signal this component
   // uses to hand rendering off to <WhoAmIRecap>.
@@ -250,7 +250,7 @@ export function WhoAmIRoomView({
 
     async function load() {
       try {
-        // Global roster (characters_select_active RLS policy — readable by
+        // Global roster (characters_select_active RLS policy - readable by
         // anyone). Alphabetical so the board layout is stable/predictable
         // across reloads rather than shuffling on every fetch.
         const { data: charRows, error: charError } = await supabase
@@ -263,8 +263,8 @@ export function WhoAmIRoomView({
         setCharacters((charRows ?? []) as CharacterRow[]);
 
         // Most recent "who-am-i" session for this room (game_sessions_
-        // select_room_members RLS policy — readable by any room member).
-        // `state` here is the turn loop state (SPEC.md §8 "Turn Loop") —
+        // select_room_members RLS policy - readable by any room member).
+        // `state` here is the turn loop state (SPEC.md §8 "Turn Loop") -
         // see games/who-am-i/logic/turnState.ts for its shape.
         const { data: sessionRow, error: sessionError } = await supabase
           .from("game_sessions")
@@ -289,7 +289,7 @@ export function WhoAmIRoomView({
         // room_members RLS policy), oldest first so it reads top-to-bottom
         // as a scrollable history (SPEC.md §8 "Chat/Log"). Includes
         // is_guess/guessed_character_id so a guess renders as its own kind
-        // of log entry (SPEC.md §8 point 6 — guessing counts as a turn
+        // of log entry (SPEC.md §8 point 6 - guessing counts as a turn
         // action, same as asking).
         const { data: questionRows, error: questionsError } = await supabase
           .from("questions_log")
@@ -302,7 +302,7 @@ export function WhoAmIRoomView({
         if (cancelled) return;
         setQuestions((questionRows ?? []) as QuestionLogRow[]);
 
-        // The masking view — see file header. Selects only the columns we
+        // The masking view - see file header. Selects only the columns we
         // actually need; character_id is never requested for OUR OWN row,
         // so there's no path (buggy or not) where this component could
         // surface it for ourselves.
@@ -316,11 +316,11 @@ export function WhoAmIRoomView({
         if (cancelled) return;
 
         // Every OTHER player's live character (SPEC.md §7). Fetched for
-        // the whole session, not filtered to a single player_id — the
+        // the whole session, not filtered to a single player_id - the
         // view nulls out only the CALLER's own row, so this always comes
         // back with everyone else's real character_id already attached.
         // Fetched even if WE joined without an assignment of our own (no
-        // `boardRow` below) — a late joiner should still get to see
+        // `boardRow` below) - a late joiner should still get to see
         // everyone else's cards to help narrow things down.
         const { data: opponentRows, error: opponentError } = await supabase
           .from("who_am_i_board")
@@ -336,7 +336,7 @@ export function WhoAmIRoomView({
 
         if (!boardRow) {
           // Joined after this session's assignment ran (e.g. connected
-          // after the host started the game) — no character was assigned
+          // after the host started the game) - no character was assigned
           // to them this round.
           setState("no-assignment");
           return;
@@ -363,7 +363,7 @@ export function WhoAmIRoomView({
     async (next: Set<string>) => {
       if (!sessionId) return;
       // Column-level UPDATE grant + who_am_i_assignments_update_own_row RLS
-      // policy — a player can write their own crossed_off_character_ids,
+      // policy - a player can write their own crossed_off_character_ids,
       // nothing else, on their own row only. No `.select()` chained, so
       // this never needs (and never gets) SELECT on the base table.
       const { error } = await supabase
@@ -397,7 +397,7 @@ export function WhoAmIRoomView({
   // ---- realtime: turn state + question log (SPEC.md §8 "Turn Loop") -----
   // Plain Postgres-changes subscriptions, same pattern RoomClient already
   // uses for rooms/players (see file header for why this is enough for
-  // now — the richer Broadcast channel is Phase 7). Postgres remains the
+  // now - the richer Broadcast channel is Phase 7). Postgres remains the
   // source of truth; this is purely for UX responsiveness.
   useEffect(() => {
     if (!sessionId) return;
@@ -442,8 +442,8 @@ export function WhoAmIRoomView({
   // sync, but a backgrounded phone can silently drop that WebSocket
   // without this component ever unmounting to trigger a fresh load. When
   // the tab becomes visible/online again, just re-read `state` and
-  // `questions_log` straight from Postgres — the same source of truth the
-  // initial-load effect already trusts — so a stale/dropped channel can't
+  // `questions_log` straight from Postgres - the same source of truth the
+  // initial-load effect already trusts - so a stale/dropped channel can't
   // leave the turn indicator or question log frozen on an old value.
   // Doesn't touch `crossedOff` (that's local-first, and re-fetching it
   // could stomp a tap made in the same instant this fires) or the recap
@@ -475,7 +475,7 @@ export function WhoAmIRoomView({
           .order("created_at", { ascending: true });
         if (questionRows) setQuestions(questionRows as QuestionLogRow[]);
       } catch {
-        // Best-effort — same reasoning as RoomClient's resync: the realtime
+        // Best-effort - same reasoning as RoomClient's resync: the realtime
         // subscription is the primary path, this is just a backstop.
       } finally {
         inFlight = false;
@@ -496,7 +496,7 @@ export function WhoAmIRoomView({
   }, [supabase, sessionId]);
 
   // ---- realtime: Broadcast channel (SPEC.md §9) --------------------------
-  // Layered on top of the postgres_changes subscription above — see this
+  // Layered on top of the postgres_changes subscription above - see this
   // file's header and games/who-am-i/realtime/broadcastEvents.ts for why
   // this is additive UX responsiveness, never a second source of truth.
   const handleTurnSync = useCallback((state: WhoAmITurnState) => setTurnState(state), []);
@@ -508,7 +508,7 @@ export function WhoAmIRoomView({
       onTurnSync: handleTurnSync,
     });
 
-  // Debounced "I'm typing a question" signal — only ever sent while it's
+  // Debounced "I'm typing a question" signal - only ever sent while it's
   // actually this player's turn to ask (see the input's onChange below).
   // Auto-clears after a pause in typing, on submit, and on unmount, so a
   // dropped final "stopped typing" broadcast doesn't matter: receivers
@@ -546,7 +546,7 @@ export function WhoAmIRoomView({
 
   // ---- recap data: unmasked board, once the game has ended --------------
   // Only fires once `endedAt` is set (initial load or realtime, see
-  // above) — before that, `who_am_i_board` still masks every player's own
+  // above) - before that, `who_am_i_board` still masks every player's own
   // row, so there'd be nothing new to read here anyway (see
   // supabase/migrations/..._who_am_i_recap_reveal.sql).
   useEffect(() => {
@@ -581,7 +581,7 @@ export function WhoAmIRoomView({
   // ---- turn loop actions: ask / answer / done ----------------------------
   // Each of these hits a trusted API route (app/api/games/who-am-i/{question,
   // answer,done}/route.ts) that re-checks turn order server-side before
-  // writing anything — see those routes for why that check can't live in
+  // writing anything - see those routes for why that check can't live in
   // RLS alone yet. The response's `state` is applied immediately so the
   // caller doesn't have to wait on the realtime round-trip for their own
   // action; the postgres_changes subscription above just keeps everyone
@@ -594,14 +594,26 @@ export function WhoAmIRoomView({
 
     // Optimistic send: the asker shouldn't have to wait on the network
     // round trip (POST + Postgres write + realtime echo back) to see their
-    // own message land — drop a temp-id row into the log and clear/lock
+    // own message land - drop a temp-id row into the log and clear/lock
     // the composer immediately. `tempId` is swapped for the real row id
     // once the server responds (below), so the realtime INSERT for this
     // same row (see the postgres_changes subscription above) is recognized
     // as the row we already have instead of appended a second time. If the
     // request fails, the optimistic row is pulled back out and the draft
     // text is restored so the player can retry without retyping.
-    const tempId = `temp-${crypto.randomUUID()}`;
+    // crypto.randomUUID() only exists in secure contexts (HTTPS, or
+    // localhost) - rooms are often opened from a phone over the LAN IP
+    // (http://192.168.1.x:3001), where it's undefined and this line would
+    // throw. The temp id is never stored, just a locally-unique optimistic
+    // marker (swapped for the real row id below), so any collision-free
+    // enough id works: prefer randomUUID when present, else the same
+    // timestamp+random scheme broadcastEvents.ts uses for its
+    // non-persisted ids.
+    const tempId = `temp-${
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+    }`;
     const optimisticRow: QuestionLogRow = {
       id: tempId,
       session_id: sessionId,
@@ -636,7 +648,7 @@ export function WhoAmIRoomView({
       if (realId) {
         setQuestions((prev) => {
           // Realtime can beat this response back (INSERT arrives before the
-          // POST resolves) and already appended the authoritative row — in
+          // POST resolves) and already appended the authoritative row - in
           // that case just drop the temp row instead of renaming it into a
           // duplicate id.
           if (prev.some((q) => q.id === realId)) {
@@ -719,7 +731,7 @@ export function WhoAmIRoomView({
   }
 
   // ---- host: manually end the game (SPEC.md §8 point 7) ------------------
-  // Hits end/route.ts, which enforces host-only server-side — this handler
+  // Hits end/route.ts, which enforces host-only server-side - this handler
   // doesn't re-check `currentPlayer.is_host` itself beyond gating whether
   // the control renders at all (see the render section below).
   function handleEndGame() {
@@ -755,7 +767,7 @@ export function WhoAmIRoomView({
   // ---- recap: host "Play Again" -------------------------------------------
   // Sends the room back to `lobby` (app/api/games/who-am-i/play-again/
   // route.ts, host-only) so the host can invite/re-invite players and start
-  // a fresh round — mirrors handleEndGame's shape but there's nothing to
+  // a fresh round - mirrors handleEndGame's shape but there's nothing to
   // confirm here (unlike ending a live game, restarting from the recap
   // screen isn't destructive). No local "success" handling is needed
   // either: RoomClient's own postgres_changes subscription on `rooms`
@@ -772,7 +784,7 @@ export function WhoAmIRoomView({
       });
       const payload = await response.json().catch(() => ({}) as { error?: string });
       if (!response.ok) throw new Error(payload.error ?? "Failed to start a new game.");
-      // Leave playAgainSubmitting true — the button should stay disabled
+      // Leave playAgainSubmitting true - the button should stay disabled
       // until RoomClient swaps this component out for the lobby view a
       // moment later. If that swap never happens (e.g. a stale realtime
       // connection), the error catch below never fires either, but that's
@@ -784,9 +796,9 @@ export function WhoAmIRoomView({
     }
   }
 
-  // ---- top bar: "Leave Game" — non-host players only (the host sees "End
+  // ---- top bar: "Leave Game" - non-host players only (the host sees "End
   // Game" in this same slot instead, wired to handleEndGame above). Purely
-  // client-side — just navigates the player back home; the disconnect
+  // client-side - just navigates the player back home; the disconnect
   // itself is already handled by the pagehide/visibility effects above the
   // same way any other tab-close would be. --------------------------------
   function handleLeaveGame() {
@@ -800,7 +812,7 @@ export function WhoAmIRoomView({
   // ---- turn loop derived view state --------------------------------------
   const askerId = turnState ? currentAskerId(turnState) : null;
   const responderId = turnState ? currentResponderId(turnState) : null;
-  // Who the asker is (about to be) composing a question FOR — only
+  // Who the asker is (about to be) composing a question FOR - only
   // meaningful during "asking" (see turnState.ts's `currentAskTargetId`).
   const askTargetId = turnState ? currentAskTargetId(turnState) : null;
   const isMyTurnToAsk = turnState?.phase === "asking" && askerId === currentPlayer.id;
@@ -814,7 +826,7 @@ export function WhoAmIRoomView({
   const canGuess = !endedAt && !hasSolved && isMyTurnToAsk && (turnState?.turnQuestionIds.length ?? 0) === 0;
 
   // ---- messaging-app restructure: one conversation per other player ------
-  // Every OTHER player, in roster order — this is the sidebar's list of
+  // Every OTHER player, in roster order - this is the sidebar's list of
   // "conversations." (SPEC.md restructure request.)
   const otherPlayers = useMemo(
     () => players.filter((p) => p.id !== currentPlayer.id),
@@ -824,7 +836,7 @@ export function WhoAmIRoomView({
   // This player's full back-and-forth with each other player: every
   // non-guess question asked by either of them, targeted at the other, in
   // chronological order. Guesses aren't part of any 1:1 conversation (no
-  // target_player_id), so they're intentionally left out here — the live
+  // target_player_id), so they're intentionally left out here - the live
   // activity feed above already surfaces them.
   const conversationsByPlayer = useMemo(() => {
     const map = new Map<string, QuestionLogRow[]>();
@@ -851,7 +863,7 @@ export function WhoAmIRoomView({
   // Auto-open/close the relevant conversation as the turn moves: while it's
   // my turn to ask, open the person I'm asking; while it's my turn to
   // answer, open whoever's asking me. The deck (main area) never gets
-  // replaced by this — it's a separate column, always visible (SPEC.md
+  // replaced by this - it's a separate column, always visible (SPEC.md
   // restructure request: "make sure their card is still being shown").
   useEffect(() => {
     if (isMyTurnToAsk && askTargetId) {
@@ -886,7 +898,7 @@ export function WhoAmIRoomView({
 
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : undefined;
   const selectedConversation = selectedPlayerId ? (conversationsByPlayer.get(selectedPlayerId) ?? []) : [];
-  // The selected opponent's own character card — this is the whole "Who Am
+  // The selected opponent's own character card - this is the whole "Who Am
   // I?" mechanic (everyone else can see your card, only you can't), and
   // `opponentCharacterByPlayer` already carries this live for every other
   // player (see the initial-load effect above); it just wasn't being read
@@ -906,7 +918,7 @@ export function WhoAmIRoomView({
   const canAnswerInSelectedChat = isMyTurnToAnswer && askerId === selectedPlayerId && !!activeQuestion;
 
   // Tapping a still-live card while `guessMode` is on submits a guess for
-  // that character directly — replaces the old <select> dropdown, and only
+  // that character directly - replaces the old <select> dropdown, and only
   // ever offers characters that haven't already been crossed off (SPEC.md
   // restructure request).
   function requestGuessForCharacter(characterId: string) {
@@ -925,6 +937,14 @@ export function WhoAmIRoomView({
     setGuessSubmitting(true);
     setGuessError(null);
     setGuessResult(null);
+    // Resolve the guessed character's name for the live feed - everyone
+    // (except the guesser, who doesn't see their own broadcast) should read
+    // "X guessed Dragon - Incorrect." rather than a bare "X guessed - not
+    // quite.", the same way Who Are You's chat shows "Guessed x -
+    // Incorrect". Safe to share: the guesser picked it themselves, and it
+    // only matches the secret identity when the guess is correct.
+    const guessedCharacterName =
+      characters.find((c) => c.id === characterId)?.name ?? null;
     try {
       const response = await fetch("/api/games/who-am-i/guess", {
         method: "POST",
@@ -939,7 +959,10 @@ export function WhoAmIRoomView({
         setTurnState(payload.state);
         broadcastTurnSync(payload.state);
       }
-      broadcastTurnEvent(payload.correct ? "guess-correct" : "guess-incorrect");
+      broadcastTurnEvent(
+        payload.correct ? "guess-correct" : "guess-incorrect",
+        guessedCharacterName ?? undefined
+      );
       setGuessResult(payload.correct ? "correct" : "incorrect");
       setGuessMode(false);
       if (payload.gameEnded) {
@@ -954,8 +977,8 @@ export function WhoAmIRoomView({
   }
 
   // ---- presence-derived hint (SPEC.md §9 Presence) -----------------------
-  // Whoever the turn indicator is currently waiting on — the asker while
-  // "asking"/"reviewing", the current responder while "answering" — flagged
+  // Whoever the turn indicator is currently waiting on - the asker while
+  // "asking"/"reviewing", the current responder while "answering" - flagged
   // if `onlineIds` (tracked centrally by RoomClient's Presence channel, see
   // this file's header) says they're not currently connected. This is only
   // ever a UX hint layered on top of Postgres-derived turn state, never a
@@ -965,17 +988,17 @@ export function WhoAmIRoomView({
     !!activeTurnPlayerId && activeTurnPlayerId !== currentPlayer.id && !onlineIds.has(activeTurnPlayerId);
 
   // ---- top bar: turn counter + status pill --------------------------------
-  // "Turn" is one full lap of `turnOrder` — a player's turn at asking.
+  // "Turn" is one full lap of `turnOrder` - a player's turn at asking.
   // There's no separate counter in the data model, but
   // `currentTurnIndex`/`turnOrder.length` already mean exactly that (see
   // ../logic/turnState.ts). Named "Turn N" to match Who Are You's header
   // conventions (instead of "Round N of M").
   const currentTurn = turnState ? turnState.currentTurnIndex + 1 : 1;
 
-  // The header's center pill — same wording and naming conventions as Who
+  // The header's center pill - same wording and naming conventions as Who
   // Are You's header ("Ask or guess for X.", "Waiting for Y…", "Your turn
   // to answer."…) so both games read identically. The longer "what to do"
-  // line that used to sit below the header is gone — its text now lives in
+  // line that used to sit below the header is gone - its text now lives in
   // the pill itself.
   const statusSubtext = !turnState
     ? "Setting Up"
@@ -998,8 +1021,8 @@ export function WhoAmIRoomView({
       "question-asked": `${name} asked a question.`,
       "answer-submitted": `${name} answered.`,
       "turn-done": `${name} ended their turn.`,
-      "guess-correct": `${name} solved it! 🎉`,
-      "guess-incorrect": `${name} guessed — not quite.`,
+      "guess-correct": `${name} solved it!`,
+      "guess-incorrect": `${name} guessed ${event.characterName ?? "a character"} - Incorrect.`,
       "game-ended": `The game has ended.`,
     };
     return byKind[event.kind];
@@ -1008,7 +1031,7 @@ export function WhoAmIRoomView({
   // ---- recap derived data (SPEC.md §8 point 7) ---------------------------
   // Ranked by `solvedPlayerIds` order (the order players actually solved
   // it in), unsolved players last. Only meaningful once `recapRows` has
-  // loaded — see the effect above.
+  // loaded - see the effect above.
   const recapEntries: WhoAmIRecapEntry[] = useMemo(() => {
     if (!turnState || recapRows.length === 0) return [];
     const characterById = new Map(characters.map((c) => [c.id, c]));
@@ -1081,11 +1104,11 @@ export function WhoAmIRoomView({
     );
   }
 
-  // Once the game has ended (either end path — see file header), rendering
+  // Once the game has ended (either end path - see file header), rendering
   // is handed off entirely to the recap; the turn loop / board below is
   // for an in-progress session only.
   if (endedAt) {
-    // Mode-aware win/loss framing (turnState.ts `getGameOutcome`) — a host
+    // Mode-aware win/loss framing (turnState.ts `getGameOutcome`) - a host
     // manually ending the round early (app/api/games/who-am-i/end/route.ts)
     // means `turnState` might not actually satisfy `isGameOver` yet, in
     // which case `getGameOutcome` returns empty winner/loser lists and
@@ -1147,7 +1170,7 @@ export function WhoAmIRoomView({
             </svg>
             How to Play
           </button>
-          {/* Host gets "End Game" here instead of "Leave Game" — this is
+          {/* Host gets "End Game" here instead of "Leave Game" - this is
               now the host's ONLY end-game control (the separate "End game
               (host)" button that used to live in the status strip below
               was removed as a duplicate). A host who just wants to leave
@@ -1196,19 +1219,19 @@ export function WhoAmIRoomView({
         </div>
       </header>
 
-      {/* Secondary, only-when-relevant status strip — presence hint, typing
+      {/* Secondary, only-when-relevant status strip - presence hint, typing
           indicator, live activity feed, solved note, and guess result.
           Layered below the compact top bar rather than crowding it
           (SPEC.md §9/§11 still want all of this surfaced, just not in the
           primary header). The host's "End Game" control used to live here
-          too — it's now merged into the top bar's Leave/End Game button
+          too - it's now merged into the top bar's Leave/End Game button
           above, so this strip is fully spectator-safe (nothing host-only
           left in it). */}
       {turnState && (
         <div className="who-am-i-status-strip">
           {activeTurnPlayerOffline && (
             <p className="who-am-i-offline-hint muted" role="status">
-              {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline — hang tight, they may be
+              {nicknameFor(activeTurnPlayerId ?? "")} appears to be offline - hang tight, they may be
               reconnecting.
             </p>
           )}
@@ -1231,7 +1254,7 @@ export function WhoAmIRoomView({
               role="status"
               aria-live="polite"
             >
-              {guessResult === "correct" ? "Correct! You solved it. 🎉" : "Not quite — your turn ends."}
+              {guessResult === "correct" ? "Correct! You solved it." : "Not quite - your turn ends."}
             </p>
           )}
 
@@ -1259,7 +1282,7 @@ export function WhoAmIRoomView({
             <h2 id="who-am-i-howtoplay-heading">How to Play</h2>
             <p>{gameConfig?.description ?? "Ask yes/no questions to figure out who you are."}</p>
             <ul>
-              <li>Everyone else can see the character card you were secretly assigned — only you can&rsquo;t.</li>
+              <li>Everyone else can see the character card you were secretly assigned - only you can&rsquo;t.</li>
               <li>On your turn, ask each other player one yes/no question to narrow it down.</li>
               <li>Tap a card on your deck to cross it off once you&rsquo;ve ruled it out.</li>
               <li>Think you know who you are? Use &ldquo;I know who I am!&rdquo; and tap your guess.</li>
@@ -1271,7 +1294,7 @@ export function WhoAmIRoomView({
         </div>
       )}
 
-      {/* Our own confirmation dialog — see `requestConfirm` above; replaces
+      {/* Our own confirmation dialog - see `requestConfirm` above; replaces
           every window.confirm() in this component so confirmations never
           surface as a native browser/tab-chrome prompt. */}
       {confirmDialog && (
@@ -1315,13 +1338,13 @@ export function WhoAmIRoomView({
 
       <div className="who-am-i-layout">
         {/* ---- Left sidebar: collapsed to just an avatar-icon rail, one per
-              conversation (player), to save space — full name/question-count/
+              conversation (player), to save space - full name/question-count/
               status now live in the chat panel header instead once a
               conversation is selected. ---- */}
         <nav className="who-am-i-sidebar" aria-label="Conversations">
           {otherPlayersCount === 0 ? (
             <p className="muted who-am-i-sidebar-empty" aria-hidden="true">
-              —
+              -
             </p>
           ) : (
             <ul className="who-am-i-conversation-list" role="list">
@@ -1335,7 +1358,7 @@ export function WhoAmIRoomView({
                       className={`who-am-i-conversation-item${isSelected ? " selected" : ""}`}
                       onClick={() => setSelectedPlayerId(player.id)}
                       aria-current={isSelected}
-                      aria-label={`${player.nickname} — ${status.label}`}
+                      aria-label={`${player.nickname} - ${status.label}`}
                       title={player.nickname}
                     >
                       <AvatarIcon
@@ -1378,7 +1401,7 @@ export function WhoAmIRoomView({
                     {selectedConversation.length} question{selectedConversation.length === 1 ? "" : "s"} asked
                   </span>
                 </div>
-                {/* Their character card — visible to everyone but them,
+                {/* Their character card - visible to everyone but them,
                     per the game's core rule (see selectedOpponentCharacter
                     above). */}
                 {selectedOpponentCharacter && (
@@ -1398,7 +1421,7 @@ export function WhoAmIRoomView({
 
               <div className="who-am-i-chat-messages">
                 {selectedConversation.length === 0 && (
-                  <p className="muted who-am-i-chat-empty">No questions yet — this conversation is empty.</p>
+                  <p className="muted who-am-i-chat-empty">No questions yet - this conversation is empty.</p>
                 )}
                 {selectedConversation.map((q) => {
                   const iAsked = q.asking_player_id === currentPlayer.id;
@@ -1426,8 +1449,6 @@ export function WhoAmIRoomView({
                           </span>
                           <p>
                             {formatAnswer(answer)}
-                            {answer === "yes" && " ✓"}
-                            {answer === "no" && " ✕"}
                           </p>
                         </div>
                       ) : (
@@ -1474,7 +1495,7 @@ export function WhoAmIRoomView({
                           disabled={answering}
                           aria-label="Answer yes"
                         >
-                          Yes ✓
+                          Yes
                         </button>
                         <button
                           type="button"
@@ -1482,7 +1503,7 @@ export function WhoAmIRoomView({
                           disabled={answering}
                           aria-label="Answer no"
                         >
-                          No ✕
+                          No
                         </button>
                         <button
                           type="button"
@@ -1543,7 +1564,7 @@ export function WhoAmIRoomView({
         </section>
 
         {/* ---- Player log: who asked/answered/ended their turn, most
-              recent first — moved here below the chat block per design
+              recent first - moved here below the chat block per design
               request. Collapsed by default to just that most-recent line
               (CSS clips everything below it) so it doesn't compete with
               the chat panel for space; hovering (mouse) or clicking/
@@ -1582,7 +1603,7 @@ export function WhoAmIRoomView({
         )}
         </div>
 
-        {/* ---- Main content: My Deck — the primary visual focus ---- */}
+        {/* ---- Main content: My Deck - the primary visual focus ---- */}
         <section className="who-am-i-deck" aria-labelledby="who-am-i-deck-heading">
           <div className="who-am-i-deck-header">
             <div>
@@ -1612,7 +1633,7 @@ export function WhoAmIRoomView({
 
           {guessMode && (
             <p className="who-am-i-guess-hint" role="status">
-              Tap a card below to guess it — a wrong guess ends your turn.
+              Tap a card below to guess it - a wrong guess ends your turn.
             </p>
           )}
           {guessError && (
@@ -1671,7 +1692,7 @@ export function WhoAmIRoomView({
           </div>
 
           {/* "I'm Done" now lives below the table, centered, instead of up
-              in the top bar — it's the natural next action once you've
+              in the top bar - it's the natural next action once you've
               reviewed the board (SPEC.md §8 "Turn Loop" reviewing phase). */}
           {isReviewingMyTurn && (
             <div className="who-am-i-done-cta">

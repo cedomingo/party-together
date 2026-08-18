@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Fix: correct guesses reported as incorrect (round 2 — see
+-- Fix: correct guesses reported as incorrect (round 2 - see
 -- 20260807140000_characters_name_unique.sql for round 1, which fixed a
 -- real-but-not-THE-bug issue: characters.name had no uniqueness
 -- guarantee. That migration landed cleanly with zero duplicates found,
@@ -14,25 +14,25 @@
 --   generated always as (
 --     guessed_character_id is not null and guessed_character_id = character_id
 --   ) stored
--- computed column 20260806120200_game_tables.sql defines — it's behaving
+-- computed column 20260806120200_game_tables.sql defines - it's behaving
 -- like a plain stored boolean that defaults to false, which nothing in
 -- the app ever writes true to (every route treats it as
 -- always-correct-by-construction, per its `generated always as`). This
 -- doesn't try to diagnose *how* the live column ended up plain instead of
--- generated — it just makes the live column match what the repo, and
+-- generated - it just makes the live column match what the repo, and
 -- every route reading it, has always assumed it already was.
 --
 -- Postgres won't let you ALTER an existing plain column into a generated
 -- one in place, so: drop and re-add as generated. `who_am_i_board`
 -- (20260806120700_who_am_i_recap_reveal.sql) selects is_guessed, so it
--- has to be dropped and recreated around the column swap too — verbatim,
+-- has to be dropped and recreated around the column swap too - verbatim,
 -- nothing about its masking logic changes here.
 --
 -- The fix is retroactive: STORED generated columns are computed for
 -- every existing row the moment they're added, so every previously
 -- mis-scored guess (dexter's two "Whisper" guesses, maaz's "Duke
 -- Marrow", missy's "Captain Ember", sam's "Captain Anchor") flips to
--- correct immediately — no replaying/re-guessing needed. `aa`'s genuine
+-- correct immediately - no replaying/re-guessing needed. `aa`'s genuine
 -- miss (guessed "Nova Stardust", was actually "Zephyr Quick") correctly
 -- stays false.
 
@@ -49,7 +49,7 @@ alter table public.who_am_i_assignments
 comment on column public.who_am_i_assignments.is_guessed is
   'Whether guessed_character_id (the player''s current guess at their own '
   'identity) matches character_id (their real, secret assignment). Always '
-  'a computed column — never write to this directly. If this ever again '
+  'a computed column - never write to this directly. If this ever again '
   'shows false for a guess whose name visibly matches the assigned '
   'character''s name, re-run: select column_name, is_generated, '
   'generation_expression from information_schema.columns where '
@@ -82,5 +82,5 @@ comment on view public.who_am_i_board is
   'calling player''s own row while the session is in progress, and '
   'revealed for every row (including the viewer''s own) once '
   'game_sessions.ended_at is set, for the recap screen (SPEC.md §8 point '
-  '7). Do not grant SELECT on the base table — that would bypass this '
+  '7). Do not grant SELECT on the base table - that would bypass this '
   'masking.';

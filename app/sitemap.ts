@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 import { games } from "@/lib/games-registry";
 
-// Static/landing pages only — room pages are noindex and must never appear
+// Static/landing pages only - room pages are noindex and must never appear
 // here. Automatically picks up new games from the registry (§4 of SPEC.md).
 // The bare /games listing is indexable; the /games?room=... swap variant is
 // ephemeral and dynamic (it mutates a room), so it is intentionally NOT
-// here — and query-param variants can't appear in a sitemap anyway.
+// here - and query-param variants can't appear in a sitemap anyway.
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://partytogether.com";
 

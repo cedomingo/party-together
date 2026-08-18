@@ -1,10 +1,10 @@
 // Pure assignment logic for "Who Am I?" game start (SPEC.md §8 "Setup").
-// No React, no I/O, no Supabase import — just: given a set of player ids
+// No React, no I/O, no Supabase import - just: given a set of player ids
 // and a set of character ids, produce a random, no-repeat pairing. This is
 // exactly what the games/who-am-i/logic/.gitkeep placeholder called for.
 //
 // The actual database write (via the service-role admin client, since
-// who_am_i_assignments has no INSERT grant for authenticated/anon at all —
+// who_am_i_assignments has no INSERT grant for authenticated/anon at all -
 // see supabase/migrations/..._who_am_i_identity_protection.sql) lives in
 // app/api/games/who-am-i/start/route.ts. Keeping this file free of I/O
 // means the shuffle/assignment algorithm itself is trivially unit-testable
@@ -20,7 +20,7 @@ export class AssignmentError extends Error {}
 /**
  * Fisher-Yates shuffle. Deliberately not `.sort(() => Math.random() - 0.5)`,
  * which is a well-known biased shuffle (some permutations are more likely
- * than others) — this game's whole premise depends on assignment actually
+ * than others) - this game's whole premise depends on assignment actually
  * being random.
  */
 function shuffled<T>(items: readonly T[]): T[] {

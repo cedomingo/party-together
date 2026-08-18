@@ -3,7 +3,7 @@
 // Results/recap screen for "Who Am I?" (SPEC.md §8 point 7: "Show a
 // results/recap screen (who guessed what, in what order, full question
 // log)."). Rendered by ../components/RoomView.tsx once
-// `game_sessions.ended_at` is set — see that file's header comment for
+// `game_sessions.ended_at` is set - see that file's header comment for
 // which two paths can set it (a correct guess that solves the last
 // remaining player, or a host manually ending the game).
 //
@@ -38,7 +38,7 @@ export interface WhoAmIRecapQuestion {
   question_text: string;
   answers: Record<string, string>;
   /** True when this entry records a guess rather than an asked question
-   * (SPEC.md §8 point 6) — mirrors RoomView's questions_log shape. */
+   * (SPEC.md §8 point 6) - mirrors RoomView's questions_log shape. */
   is_guess?: boolean;
   guessedCharacterName?: string | null;
 }
@@ -51,7 +51,7 @@ interface WhoAmIRecapProps {
   error: string | null;
   /**
    * Win-condition variant for this session, and the outcome it produced
-   * (turnState.ts `getGameOutcome`) — null/empty when the session hasn't
+   * (turnState.ts `getGameOutcome`) - null/empty when the session hasn't
    * actually reached a mode-defined game-over state (e.g. the host ended
    * the round manually while multiple players were still unsolved), in
    * which case this just falls back to the plain "who solved it" list
@@ -61,7 +61,7 @@ interface WhoAmIRecapProps {
   winnerPlayerIds?: string[];
   loserPlayerIds?: string[];
   /** Whether the CALLER (not necessarily anyone in `entries`) is this
-   * room's host — only the host can send everyone back to the lobby, same
+   * room's host - only the host can send everyone back to the lobby, same
    * restriction as starting/ending the game itself. */
   isHost: boolean;
   /** Host-only: sends the room back to `lobby` so it can be re-invited to
@@ -176,7 +176,7 @@ export function WhoAmIRecap({
                       <span className="muted">
                         was {entry.characterName ?? "Unknown"}
                         {entry.guessedCharacterName &&
-                          ` \u2014 last guessed ${entry.guessedCharacterName}`}
+                          ` - last guessed ${entry.guessedCharacterName}`}
                       </span>
                     </span>
                     {loserSet.has(entry.playerId) && (
@@ -201,7 +201,7 @@ export function WhoAmIRecap({
                   <li key={q.id} className="who-am-i-log-entry who-am-i-log-entry-guess">
                     <p className="who-am-i-log-question">
                       <strong>{nicknameFor(q.asking_player_id)}</strong> guessed{" "}
-                      <strong>{q.guessedCharacterName ?? "a character"}</strong> —{" "}
+                      <strong>{q.guessedCharacterName ?? "a character"}</strong> -{" "}
                       <span
                         className={
                           wasCorrect ? "who-am-i-guess-result-correct" : "who-am-i-guess-result-incorrect"
@@ -240,7 +240,7 @@ export function WhoAmIRecap({
 
       {/* Host-only actions, mirroring the End Game vs Leave Game split
           elsewhere in this game: "Play Again" sends the room back to the
-          lobby (onPlayAgain — app/api/games/who-am-i/play-again/route.ts)
+          lobby (onPlayAgain - app/api/games/who-am-i/play-again/route.ts)
           for a fresh round of the SAME game; "Play More Games" sends the
           host to /games?room=CODE to swap the room to a DIFFERENT game
           (app/api/rooms/switch-game/route.ts) without anyone leaving.

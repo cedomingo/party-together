@@ -3,7 +3,7 @@
 -- model: previously the active player asked ONE public question and every
 -- other player answered it in sequence; now the active player asks a
 -- DIFFERENT question to EACH other player, one at a time, and only that
--- player answers it). SPEC.md §8 "Turn Loop" is being reinterpreted here —
+-- player answers it). SPEC.md §8 "Turn Loop" is being reinterpreted here -
 -- see games/who-am-i/logic/turnState.ts for the state-machine side of this
 -- change.
 --
@@ -23,7 +23,7 @@ alter table public.questions_log
 comment on column public.questions_log.target_player_id is
   'The single player this question is directed at (real 1:1 targeting, not '
   'broadcast to the room). Null only for is_guess = true rows, which have '
-  'no target — see the check constraint below. Every non-guess row must '
+  'no target - see the check constraint below. Every non-guess row must '
   'have exactly one target, and `answers` is expected to end up with at '
   'most that one player''s entry.';
 
@@ -46,7 +46,7 @@ create index questions_log_target_player_id_idx on public.questions_log (target_
 -- 20260806120400_rls_core.sql) the same amount that policy already tightens
 -- around asking_player_id: a room member can't name a target who isn't
 -- actually in the same room. This still doesn't verify turn *order* (same
--- documented gap as the original policy — that stays an application-layer
+-- documented gap as the original policy - that stays an application-layer
 -- check in question/route.ts), just room membership of the target.
 drop policy questions_log_insert_asker_only on public.questions_log;
 

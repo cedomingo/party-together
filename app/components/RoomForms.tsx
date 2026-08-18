@@ -1,7 +1,7 @@
 "use client";
 
 // Combines the avatar creator with the Create/Join forms so every page
-// that offers "create or join a room" (home page, per-game landing page —
+// that offers "create or join a room" (home page, per-game landing page -
 // SPEC.md §7) shares one name/avatar picker instead of each form asking
 // for a nickname separately. The chosen name/look is remembered in
 // localStorage so it carries over between the home page and a specific
@@ -33,7 +33,7 @@ export function RoomForms({
   const [avatar, setAvatar] = useState<AvatarSelection>(DEFAULT_AVATAR);
   const [hydrated, setHydrated] = useState(false);
   // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
-  // — the picker and the Create/Join buttons below both wait on this so a
+  // - the picker and the Create/Join buttons below both wait on this so a
   // player never sees their avatar pop in late or clicks Next into an
   // avatar that hasn't actually finished loading.
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);

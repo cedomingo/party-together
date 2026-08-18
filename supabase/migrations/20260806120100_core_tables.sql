@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Phase 1: core platform tables — rooms, players (SPEC.md §5)
+-- Phase 1: core platform tables - rooms, players (SPEC.md §5)
 -- ---------------------------------------------------------------------------
 -- Identity model: there is no traditional login. Every browser session signs
 -- in via Supabase Anonymous Auth (auth.users row, real auth.uid()). The
@@ -33,7 +33,7 @@ create table public.players (
   is_host boolean not null default false,
   connected boolean not null default true,
   joined_at timestamptz not null default now(),
-  -- One player row per auth session per room — re-joining the same room
+  -- One player row per auth session per room - re-joining the same room
   -- from the same session should upsert onto this row, not duplicate it.
   unique (room_id, auth_id)
 );

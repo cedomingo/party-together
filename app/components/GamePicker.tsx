@@ -2,11 +2,11 @@
 
 // Game-selection card grid (cover photo + client-side search), rendered by
 // the /games listing page (app/components/GamesListing.tsx). Game-agnostic:
-// it just renders whatever `games` it's handed — each game as a card
-// (cover from thumbnailPath, displayName, description) — and leaves the
+// it just renders whatever `games` it's handed - each game as a card
+// (cover from thumbnailPath, displayName, description) - and leaves the
 // click behavior to the caller via `onSelect(gameId)`. The `selectedGameId`
-// prop drives the selection highlight (unused today — the /games page
-// navigates or switches on click — but kept so a select-in-place caller
+// prop drives the selection highlight (unused today - the /games page
+// navigates or switches on click - but kept so a select-in-place caller
 // can highlight its pick).
 //
 // The search field filters cards client-side by displayName/description
@@ -24,7 +24,7 @@ export function GamePicker({
   onSelect,
 }: {
   games: GameSummary[];
-  /** Currently selected card id (highlight). Optional — browse mode
+  /** Currently selected card id (highlight). Optional - browse mode
    * (where a click navigates away immediately) passes nothing. */
   selectedGameId?: string | null;
   onSelect: (gameId: string) => void;
@@ -42,7 +42,7 @@ export function GamePicker({
   }, [games, query]);
 
   if (games.length === 0) {
-    return <p className="muted">No games are registered yet — nothing to play just yet.</p>;
+    return <p className="muted">No games are registered yet - nothing to play just yet.</p>;
   }
 
   return (
@@ -71,7 +71,7 @@ export function GamePicker({
                   className={`game-picker-card${selected ? " selected" : ""}`}
                   onClick={() => onSelect(game.id)}
                   aria-pressed={selected}
-                  aria-label={`${game.displayName} — ${game.description}`}
+                  aria-label={`${game.displayName} - ${game.description}`}
                 >
                   <span className="game-picker-cover">
                     {/* Plain <img> rather than next/image on purpose: the

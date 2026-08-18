@@ -1,4 +1,4 @@
-// Shared avatar-creator data (SPEC.md-adjacent, but purely presentational —
+// Shared avatar-creator data (SPEC.md-adjacent, but purely presentational -
 // no backend persistence yet). Mushrooms are the base body/color; accessories
 // are optional transparent overlays. Both live under /public/ui/avatar and
 // share the same 2025x2025 canvas, so an accessory always lines up with the
@@ -8,7 +8,7 @@ export interface MushroomOption {
   id: string;
   label: string;
   src: string;
-  /** Small swatch color used for the color-picker dot — approximate, just for the UI chrome. */
+  /** Small swatch color used for the color-picker dot - approximate, just for the UI chrome. */
   swatch: string;
 }
 
@@ -66,7 +66,7 @@ export const DEFAULT_AVATAR: AvatarSelection = {
 };
 
 // ---------------------------------------------------------------------
-// Local persistence — remembers name/color/accessory across visits (and
+// Local persistence - remembers name/color/accessory across visits (and
 // across the homepage, per-game landing pages, and joining via an invite
 // link) so a player never has to rebuild their look every time they
 // create or join a room. Shared by every screen that renders
@@ -75,7 +75,7 @@ export const DEFAULT_AVATAR: AvatarSelection = {
 // read/write the same record instead of each keeping its own copy.
 //
 // localStorage rather than a cookie: this is a client-only display
-// preference — nothing server-side ever needs to read it (see the
+// preference - nothing server-side ever needs to read it (see the
 // `AvatarSelection` note above), so there's no reason to pay the
 // send-it-with-every-request cost a cookie carries.
 // ---------------------------------------------------------------------
@@ -111,13 +111,13 @@ export function saveStoredAvatar(avatar: AvatarSelection): void {
   try {
     window.localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(avatar));
   } catch {
-    // Storage can be unavailable (private browsing, quota) — the picker
+    // Storage can be unavailable (private browsing, quota) - the picker
     // still works for this visit, it just won't be remembered.
   }
 }
 
 // ---------------------------------------------------------------------
-// Asset preloading — every mushroom/accessory PNG the picker can show
+// Asset preloading - every mushroom/accessory PNG the picker can show
 // needs to already be in the browser's cache *before* the picker (and its
 // Create/Join/Next action) is shown. Without this, cycling the ‹ › arrows
 // or hitting Next fires off a fresh image request for whichever option
@@ -127,14 +127,14 @@ export function saveStoredAvatar(avatar: AvatarSelection): void {
 // then reveal the avatar creator itself.
 //
 // Deliberately not a React hook (see AvatarCreator's own note on why
-// hooks don't belong in this file — lib/rooms/index.ts imports MUSHROOMS/
+// hooks don't belong in this file - lib/rooms/index.ts imports MUSHROOMS/
 // ACCESSORIES from here on the server, so this module has to stay
 // safe to import outside a client component). Client components call
 // `preloadAvatarAssets()` from their own `useEffect`.
 //
 // Cached at module scope (not per-call) so mounting the avatar creator
-// more than once in a session — home page, then a game landing page, then
-// the in-room "join by link" form — only ever pays the download cost
+// more than once in a session - home page, then a game landing page, then
+// the in-room "join by link" form - only ever pays the download cost
 // once; every later mount resolves immediately against the same promise
 // (and, after the first run, against the browser's own HTTP cache too).
 // ---------------------------------------------------------------------
@@ -157,7 +157,7 @@ export function preloadAvatarAssets(): Promise<void> {
           const img = new window.Image();
           img.onload = () => resolve();
           // A single slow/broken asset shouldn't block the whole picker
-          // forever — treat a failed load the same as a finished one.
+          // forever - treat a failed load the same as a finished one.
           img.onerror = () => resolve();
           img.src = src;
         })

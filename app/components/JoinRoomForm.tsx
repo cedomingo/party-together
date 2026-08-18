@@ -3,7 +3,7 @@
 // Platform-core "Join Room" form (SPEC.md §7): code + nickname, no account.
 //
 // `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
-// via RoomForms.tsx) — there used to be a second "Your nickname" input
+// via RoomForms.tsx) - there used to be a second "Your nickname" input
 // here, but the avatar creator above already asks for a name once, and
 // everything on this page shares it.
 
@@ -38,7 +38,7 @@ export function JoinRoomForm({
     setError(null);
     try {
       const result = await joinRoomByCodeViaApi(code, nickname, mushroomIndex, accessoryIndex);
-      // A game-less room has no /games/<game>/room/<code> URL yet — send the
+      // A game-less room has no /games/<game>/room/<code> URL yet - send the
       // joiner to the picker page with the room code instead, where they'll
       // see the roster and wait with everyone else until the host picks a
       // game (after which they land in the game's waiting room).
@@ -75,7 +75,7 @@ export function JoinRoomForm({
 
       {/* Deliberately NOT gated on avatar-image preloading: the avatar
           indices are already known (localStorage/defaults) and nothing
-          about joining needs the PNGs — the ~29 MB preload only feeds the
+          about joining needs the PNGs - the ~29 MB preload only feeds the
           preview. Blocking the CTA on it made create/join feel dead for
           seconds on slow connections. The preview still shows its skeleton
           until assets arrive (AvatarCreator's assetsReady). */}

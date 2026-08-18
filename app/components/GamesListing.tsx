@@ -3,24 +3,24 @@
 // The /games listing page's interactive half (server page: app/games/page.tsx).
 //
 // browse mode (no `roomCode`): renders the shared <GamePicker>; clicking a
-// card creates a room for that game on the spot — using the saved
-// avatar/name (lib/avatar.ts localStorage) — and goes straight to the
+// card creates a room for that game on the spot - using the saved
+// avatar/name (lib/avatar.ts localStorage) - and goes straight to the
 // room. The per-game landing page (/games/[game], with its avatar creator
 // and Create form) still exists for direct/SEO visits but is skipped here.
 //
-// room mode (?room=CODE): this page IS the room's pre-game waiting room —
+// room mode (?room=CODE): this page IS the room's pre-game waiting room -
 // the room may be a game-less shell (just created on the home page) or a
 // finished room being swapped to a new game. It shows the room code +
 // copy-invite-link button, a LIVE player roster (the same <RoomRoster>
 // markup/CSS RoomClient's lobby uses, driven by the same realtime/presence
 // channels), and the game picker. Clicking a game card switches the room to
-// that game (app/api/rooms/switch-game/route.ts — host-only) and redirects
+// that game (app/api/rooms/switch-game/route.ts - host-only) and redirects
 // into its waiting room. Phase D gates this behind an avatar-first join
 // flow for non-members; Phase E auto-redirects members when the host picks.
 //
 // Either way, clicking a game swaps the whole listing for the shared
 // loading screen (embedded <StatusScreen>) BEFORE the create/switch
-// request goes out — the user gets instant "something is happening"
+// request goes out - the user gets instant "something is happening"
 // feedback instead of a dead wait on the grid. On failure the state
 // clears and the game list (with the error) comes right back.
 
@@ -82,7 +82,7 @@ export function GamesListing({
   const [launchingGameId, setLaunchingGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Same copy-invite-link pattern as RoomClient.tsx's handleCopyLink/
-  // copyLabel (label flips to confirm for a couple of seconds) — mirrored
+  // copyLabel (label flips to confirm for a couple of seconds) - mirrored
   // here rather than extracted because the URL differs (/games?room=CODE
   // now, the room URL there) and the two are deliberately kept in sync.
   const [copyLabel, setCopyLabel] = useState("Copy invite link");
@@ -91,12 +91,12 @@ export function GamesListing({
   // Mirrors RoomClient.tsx's non-member join flow exactly: AvatarCreator
   // first (name + look, localStorage-backed via lib/avatar.ts), then a
   // "Join Room" action. The host (already a member) and any other member
-  // never see this — only unknown visitors to /games?room=CODE.
+  // never see this - only unknown visitors to /games?room=CODE.
   const [joinAvatar, setJoinAvatar] = useState<AvatarSelection>(() => loadStoredAvatar());
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
-  // — see the same gating in RoomClient.tsx.
+  // - see the same gating in RoomClient.tsx.
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
 
   useEffect(() => {
@@ -198,7 +198,7 @@ export function GamesListing({
           const prevGameId = gameIdRef.current;
           setRoom(next);
           // Phase E: when the host picks a game (game_id null → value) or
-          // switches to a different one (Play More Games), follow along —
+          // switches to a different one (Play More Games), follow along -
           // every member on this page lands in the new game's waiting room
           // without a refresh.
           if (next.game_id && next.game_id !== prevGameId) {
@@ -211,7 +211,7 @@ export function GamesListing({
     return () => {
       supabase.removeChannel(channel);
     };
-    // Intentionally keyed on room?.id, not `room` itself — `room` changes on
+    // Intentionally keyed on room?.id, not `room` itself - `room` changes on
     // every realtime update this effect receives, which would tear down and
     // resubscribe the channel in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,7 +238,7 @@ export function GamesListing({
     return () => {
       supabase.removeChannel(channel);
     };
-    // Same rationale as the effect above — keyed on ids, not the objects.
+    // Same rationale as the effect above - keyed on ids, not the objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, currentPlayer?.id]);
 
@@ -264,7 +264,7 @@ export function GamesListing({
   // ---- lobby sweep: drop seats offline past the grace window ------------
   // Runs while the room is still in the lobby so the roster (and any
   // player-count gates) reflects who's actually here without waiting for
-  // the game-start routes' authoritative sweep. Any member can trigger it —
+  // the game-start routes' authoritative sweep. Any member can trigger it -
   // it's idempotent and cheap. Stops once the room leaves the lobby.
   useEffect(() => {
     if (!room || room.status !== "lobby") return;
@@ -278,7 +278,7 @@ export function GamesListing({
     sweep();
     const timer = setInterval(sweep, LOBBY_SWEEP_INTERVAL_MS);
     return () => clearInterval(timer);
-    // Keyed on ids/status, not `room` itself — same rationale as the
+    // Keyed on ids/status, not `room` itself - same rationale as the
     // realtime effect above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, room?.status]);
@@ -315,7 +315,7 @@ export function GamesListing({
     try {
       if (!roomCode) {
         // Browse mode: create a room for this game right away with the
-        // saved avatar (name/look from localStorage — there's no avatar
+        // saved avatar (name/look from localStorage - there's no avatar
         // creator on this page) and go straight to the room. If no name
         // was ever saved, fall back to a plain "Player" so creation never
         // fails on a missing nickname (sanitizeNickname requires 1-32
@@ -338,7 +338,7 @@ export function GamesListing({
       });
       const payload = await response.json().catch(() => ({}) as { error?: string });
       if (!response.ok) throw new Error(payload.error ?? "Couldn't switch games.");
-      // Same room code, same players — just a new game (and a room that's
+      // Same room code, same players - just a new game (and a room that's
       // back in the lobby waiting for the host to start it).
       router.push(`/games/${gameId}/room/${roomCode}`);
     } catch (err) {
@@ -356,7 +356,7 @@ export function GamesListing({
       setCopyLabel("Copied!");
       setTimeout(() => setCopyLabel("Copy invite link"), 2000);
     } catch {
-      setCopyLabel("Copy failed — copy manually");
+      setCopyLabel("Copy failed - copy manually");
     }
   }
 
@@ -394,7 +394,7 @@ export function GamesListing({
   return (
     <>
       {/* Page header: title left, copy-invite-link pinned to the far right
-          (in room mode, once the room has loaded) — never inline after the
+          (in room mode, once the room has loaded) - never inline after the
           room-info text below. */}
       <div className="games-heading">
         <h1>Browse Party Games</h1>
@@ -438,11 +438,11 @@ export function GamesListing({
           {loadState === "ready" && room && (
             <>
               <p className="muted">
-                Room <strong>{room.code}</strong> — share this invite link with friends!
+                Room <strong>{room.code}</strong> - share this invite link with friends!
               </p>
 
               {currentPlayer ? (
-                // Member: the room's actual pre-game screen — live roster + the
+                // Member: the room's actual pre-game screen - live roster + the
                 // game picker (host picks, everyone follows once a game lands;
                 // non-host clicks get a host-only error from the switch route).
                 <>
@@ -462,12 +462,12 @@ export function GamesListing({
                 </>
               ) : room.status !== "lobby" ? (
                 <p className="field-error" role="alert">
-                  This room has already started, and you weren&rsquo;t part of it — new players can&rsquo;t
+                  This room has already started, and you weren&rsquo;t part of it - new players can&rsquo;t
                   join mid-game.
                 </p>
               ) : (
                 // Unknown visitor: avatar-first join gate before any roster or
-                // game list — mirror of RoomClient's non-member flow. Room-full
+                // game list - mirror of RoomClient's non-member flow. Room-full
                 // and similar are surfaced by the join route on submit (a
                 // non-member can't read the player list, so a local pre-check
                 // would be wrong here).
@@ -488,7 +488,7 @@ export function GamesListing({
                         {joinError}
                       </p>
                     )}
-                    {/* Not gated on avatar preload — the indices are known
+                    {/* Not gated on avatar preload - the indices are known
                         already; the ~29 MB image preload only feeds the
                         preview skeleton. See RoomForms.tsx. */}
                     <button type="submit" disabled={joining || !joinAvatar.name.trim()}>

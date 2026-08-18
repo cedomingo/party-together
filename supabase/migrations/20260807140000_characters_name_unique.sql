@@ -6,21 +6,21 @@
 -- 20260806120200_game_tables.sql), even though every reader of this table
 -- assumes it:
 --   - scripts/seed-who-am-i.ts upserts by name and its own comment says
---     "Names must be unique — the seed script upserts by name."
+--     "Names must be unique - the seed script upserts by name."
 --   - games/who-am-i/components/RoomView.tsx builds the "guess who you are"
 --     <select> as `characters.map(c => <option value={c.id}>{c.name}</option>)`.
 --
 -- If the `characters` table ever ends up with two rows sharing a name (a
--- one-off dashboard insert, a manual test row, etc. — nothing stops it
+-- one-off dashboard insert, a manual test row, etc. - nothing stops it
 -- today, since the only write path is the service-role seed script, which
 -- bypasses RLS entirely), the guess dropdown shows that name twice as two
 -- visually-identical options with two different underlying ids. A player
 -- assigned character_id = A can pick the option that happens to submit
--- character_id = B — same label, wrong id — and guess/route.ts (correctly)
+-- character_id = B - same label, wrong id - and guess/route.ts (correctly)
 -- reports that as incorrect, because it *is* a different row, even though
 -- the name the player typed/selected was right. Meanwhile any other player
 -- looking at that player's revealed card is reading the *correct* row's
--- name, so from their side everything looks right — exactly the "my other
+-- name, so from their side everything looks right - exactly the "my other
 -- account can see I'm Whisper" symptom.
 --
 -- Fix, in two parts:
@@ -30,7 +30,7 @@
 --      below is added. Every foreign key into `characters.id` gets
 --      repointed at the canonical row first.
 --   2. A real UNIQUE constraint on `name`, so this can't silently happen
---      again — any future insert/update that would create a duplicate
+--      again - any future insert/update that would create a duplicate
 --      name now fails loudly (as a 23505 from the seed script) instead of
 --      quietly shipping a broken guess dropdown.
 -- ---------------------------------------------------------------------------

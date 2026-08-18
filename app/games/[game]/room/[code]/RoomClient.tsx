@@ -1,19 +1,19 @@
 "use client";
 
-// Game-agnostic live room view (SPEC.md §7, §9). This is platform core —
+// Game-agnostic live room view (SPEC.md §7, §9). This is platform core -
 // it renders the lobby, player list, host badge, and "Start Game" stub for
-// ANY registered game. It never imports from /games/** directly — only
+// ANY registered game. It never imports from /games/** directly - only
 // from /lib/games-registry.ts, both for the GameConfig shape (display copy)
 // and, once a game starts, to resolve whichever component that game
 // registered for its in-room view (see `getGameRoomView` below).
 //
 // That resolved component is also what renders for a "finished" room, not
-// just "in_progress" — the registry doesn't have (and doesn't need) a
+// just "in_progress" - the registry doesn't have (and doesn't need) a
 // separate "recap view" slot per game. A game module's own room view is
 // trusted to look at `room.status` / its own session state and decide what
 // "in progress" vs. "finished" looks like internally (SPEC.md §8 point 7's
 // recap screen, for "who-am-i"). This file stays exactly as game-agnostic
-// either way — it still only ever calls into the registry.
+// either way - it still only ever calls into the registry.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -50,7 +50,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
-  // Resolved client-side, not passed down from the Server Component page —
+  // Resolved client-side, not passed down from the Server Component page -
   // GameConfig can carry a game-specific `onStart` function (see
   // lib/games-registry.ts), and functions can't cross the Server Component
   // -> Client Component boundary. Same reasoning as `getGameRoomView` below.
@@ -60,7 +60,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // it, the start/play-again/switch-game routes all validate it), so the
   // config follows the room's actual game from then on. This is what lets a
   // player still sitting on the old game's room URL see the lobby with the
-  // NEW game after a host swaps games on /games?room=... — the realtime
+  // NEW game after a host swaps games on /games?room=... - the realtime
   // rooms UPDATE lands here (setRoom below) and this memo re-resolves
   // without a reload.
   const gameConfig = useMemo(() => getGameConfig(room?.game_id ?? game), [game, room?.game_id]);
@@ -74,7 +74,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   // False until every mushroom/accessory image is preloaded (lib/avatar.ts)
-  // — see the same gating in RoomForms.tsx. Kicked off unconditionally on
+  // - see the same gating in RoomForms.tsx. Kicked off unconditionally on
   // mount (not only once the join form is actually reached) so the assets
   // have as much of a head start as possible against the room lookup this
   // component is also doing.
@@ -98,7 +98,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   const [copyLabel, setCopyLabel] = useState("Copy invite link");
 
   // Opaque host-set lobby config for whichever game is active (e.g. "Who Am
-  // I?"'s win-condition checkbox) — see GameConfig.LobbyOptions/
+  // I?"'s win-condition checkbox) - see GameConfig.LobbyOptions/
   // defaultLobbyOptions/onStart in lib/games-registry.ts. RoomClient never
   // looks inside this value, just seeds/threads it through.
   const [lobbyOptions, setLobbyOptions] = useState<unknown>(gameConfig?.defaultLobbyOptions);
@@ -110,7 +110,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     () => players.find((p) => p.auth_id === userId) ?? null,
     [players, userId]
   );
-  // Resolved via the registry, not imported from /games/** directly — see
+  // Resolved via the registry, not imported from /games/** directly - see
   // /lib/games-registry.ts. This is the whole point of Phase 3: this file
   // never needs to know "Who Am I?" (or any future game) exists.
   const GameRoomView = useMemo(
@@ -197,7 +197,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return () => {
       supabase.removeChannel(channel);
     };
-    // Intentionally keyed on room?.id, not `room` itself — `room` changes on
+    // Intentionally keyed on room?.id, not `room` itself - `room` changes on
     // every realtime update this effect receives, which would tear down and
     // resubscribe the channel in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,7 +224,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return () => {
       supabase.removeChannel(channel);
     };
-    // Same rationale as the effect above — keyed on ids, not the objects.
+    // Same rationale as the effect above - keyed on ids, not the objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, currentPlayer?.id]);
 
@@ -249,7 +249,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // ---- lobby sweep: drop seats offline past the grace window ------------
   // Runs while the room is still in the lobby so the roster (and the host's
   // Start gate) reflects who's actually here without waiting for the start
-  // route's authoritative sweep. Any member can trigger it — it's
+  // route's authoritative sweep. Any member can trigger it - it's
   // idempotent and cheap. Sweeping mid-game is meaningless (and could
   // orphan session state), so it stops once the room leaves the lobby.
   useEffect(() => {
@@ -264,7 +264,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     sweep();
     const timer = setInterval(sweep, LOBBY_SWEEP_INTERVAL_MS);
     return () => clearInterval(timer);
-    // Keyed on ids/status, not `room` itself — same rationale as the
+    // Keyed on ids/status, not `room` itself - same rationale as the
     // realtime effect above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, room?.status]);
@@ -287,10 +287,10 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // §11 "reconnect-safe: refreshing the page mid-game should not lose a
   // player's state") -------------------------------------------------
   // A full page refresh already rehydrates everything correctly (see the
-  // initial-load effect above — it reads room/players straight from
+  // initial-load effect above - it reads room/players straight from
   // Postgres on every mount). This effect covers the *other* half of
   // "reconnect-safe": a phone locked/backgrounded for a while, or a laptop
-  // waking from sleep, doesn't unmount this component at all — React state
+  // waking from sleep, doesn't unmount this component at all - React state
   // and the existing Realtime channels just sit there, and mobile OSes in
   // particular are known to silently drop idle WebSocket connections
   // without the app ever seeing a clean close event. Rather than trust
@@ -298,7 +298,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // retry" isn't the same guarantee as "definitely already has"), treat
   // becoming visible/online again as a cheap cue to reconcile straight
   // from Postgres: re-fetch room + players and, if this session's own row
-  // had fallen out of `connected`, flip it back — the same
+  // had fallen out of `connected`, flip it back - the same
   // source-of-truth read the initial load already trusts, just re-run
   // without a full reload.
   const userIdRef = useRef<string | null>(null);
@@ -325,7 +325,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
           setPlayers((prev) => prev.map((p) => (p.id === mine.id ? { ...p, connected: true } : p)));
         }
       } catch {
-        // Best-effort — the Realtime subscriptions and the next natural
+        // Best-effort - the Realtime subscriptions and the next natural
         // resync attempt are the backstop; don't surface a transient
         // background-refresh failure as a user-facing error.
       } finally {
@@ -344,7 +344,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
       window.removeEventListener("online", resync);
       window.removeEventListener("pageshow", resync);
     };
-    // Keyed on room?.id, not `room` — same rationale as the postgres-changes
+    // Keyed on room?.id, not `room` - same rationale as the postgres-changes
     // effect above: `room` changes on every resync, which would otherwise
     // tear down and re-add these listeners in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -372,7 +372,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     setErrorMessage(null);
     try {
       // Games can register their own start behavior (see GameConfig.onStart
-      // in lib/games-registry.ts) — e.g. "Who Am I?" needs to assign
+      // in lib/games-registry.ts) - e.g. "Who Am I?" needs to assign
       // characters as part of starting. This file never needs to know that;
       // it just calls whatever the registry handed back, or falls back to
       // the generic core stub for games that don't need anything special.
@@ -399,7 +399,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
       setCopyLabel("Copied!");
       setTimeout(() => setCopyLabel("Copy invite link"), 2000);
     } catch {
-      setCopyLabel("Copy failed — copy manually");
+      setCopyLabel("Copy failed - copy manually");
     }
   }
 
@@ -434,7 +434,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
 
   // A room created as a game-less shell on the home page but visited by URL
   // before the host has picked a game. There's nothing meaningful to render
-  // (no game config, no lobby options, no game to start) — point the
+  // (no game config, no lobby options, no game to start) - point the
   // visitor back at the picker instead of showing a broken lobby. In normal
   // flow this is unreachable: the host picks the game on /games and is
   // redirected to this URL only after the game is set.
@@ -443,7 +443,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
       <StatusScreen kind="info" title="No game picked yet">
         <p>
           This room hasn&rsquo;t chosen a game yet. Head to the <Link href="/games">game picker</Link>{" "}
-          to pick one — you&rsquo;ll be taken to this room&rsquo;s waiting room.
+          to pick one - you&rsquo;ll be taken to this room&rsquo;s waiting room.
         </p>
       </StatusScreen>
     );
@@ -452,9 +452,9 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   // Known member: show the lobby / in-progress view.
   if (currentPlayer) {
     // Once a game is in progress (or finished), that game's own room-view
-    // component owns the full page presentation — including its own header
+    // component owns the full page presentation - including its own header
     // and player roster (e.g. WhoAmIRoomView's top bar with the round/turn
-    // status and the player-avatar row) — so platform core's generic
+    // status and the player-avatar row) - so platform core's generic
     // "Who Am I?" title + room-code/copy-link header and the flat
     // Players (N) list only render during the lobby, before a GameRoomView
     // exists to take over.
@@ -505,7 +505,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
                 {gameConfig && players.length < gameConfig.minPlayers && (
                   <p className="muted" role="status">
                     {gameConfig.displayName} needs at least {gameConfig.minPlayers} players to
-                    start — {gameConfig.minPlayers - players.length} more needed.
+                    start - {gameConfig.minPlayers - players.length} more needed.
                   </p>
                 )}
               </>
@@ -520,11 +520,11 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
             {/* Platform core stops here: rendering for an in-progress OR
                 finished game is always resolved through the registry, never
                 hardcoded to a specific game. A game's own room-view
-                component decides internally what to show for each status —
+                component decides internally what to show for each status -
                 for "who-am-i" that means the turn loop / board while
                 `room.status` is "in_progress", and the recap once its
                 session has ended (which is also when `room.status` flips to
-                "finished" — see app/api/games/who-am-i/_lib/turnSession.ts's
+                "finished" - see app/api/games/who-am-i/_lib/turnSession.ts's
                 `endGameSession`). If a game hasn't registered a room view
                 (or the room's game_id is unrecognized), fall back to a plain
                 status line instead of assuming any particular game exists. */}
@@ -559,7 +559,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return (
       <StatusScreen kind="info" title={gameConfig?.displayName ?? room.game_id}>
         <p>
-          This room has already started, and you weren&rsquo;t part of it — new players can&rsquo;t
+          This room has already started, and you weren&rsquo;t part of it - new players can&rsquo;t
           join mid-game.
         </p>
       </StatusScreen>
@@ -567,7 +567,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
   }
 
   // Room-full (SPEC.md §7 host-set max_players cap; §11 room-full error
-  // state). Checked here — before rendering the join form at all — for
+  // state). Checked here - before rendering the join form at all - for
   // anyone landing on the room link who isn't already a member; an
   // existing member is always handled by the branch above instead (a room
   // filling up after you joined never locks you out of your own slot).
@@ -580,7 +580,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     return (
       <StatusScreen kind="info" title="Room is full">
         <p>
-          {gameConfig?.displayName ?? room.game_id} — room <strong>{room.code}</strong> already has its
+          {gameConfig?.displayName ?? room.game_id} - room <strong>{room.code}</strong> already has its
           maximum of {room.max_players} player{room.max_players === 1 ? "" : "s"}. Ask the host to open a
           new room, or check back if someone might drop.
         </p>
@@ -609,7 +609,7 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
             {joinError}
           </p>
         )}
-        {/* Not gated on avatar preload — the indices are known already;
+        {/* Not gated on avatar preload - the indices are known already;
             the ~29 MB image preload only feeds the preview skeleton. */}
         <button type="submit" disabled={joining || !joinAvatar.name.trim()}>
           {joining ? "Joining…" : "Join room"}

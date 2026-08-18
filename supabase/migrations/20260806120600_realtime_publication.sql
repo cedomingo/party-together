@@ -5,7 +5,7 @@
 -- events live (SPEC.md §7, §9: "Postgres changes subscription on
 -- rooms/players for lobby presence and room state"). Tables aren't
 -- broadcast over Realtime until they're added to the `supabase_realtime`
--- publication — RLS still applies on top of this, a client only receives
+-- publication - RLS still applies on top of this, a client only receives
 -- change events for rows it's allowed to SELECT.
 --
 -- Presence and Broadcast (also §9) are client-side channel features and

@@ -3,7 +3,7 @@
 // Results/recap screen for "Who Are You?" (WHO-ARE-YOU-SPEC.md §9).
 // One tab per player; each tab shows that player's outcome against every
 // opponent (solved/unsolved + turn number) and their per-opponent Q&A
-// history — restructured from Who Am I's single ranked list for the
+// history - restructured from Who Am I's single ranked list for the
 // all-pairs shape.
 
 import { useMemo, useState } from "react";
@@ -196,8 +196,8 @@ export function WhoAreYouRecap({
                         if (!rival) return null;
                         const solved = pairingFor(selected.playerId, rival);
                         return solved
-                          ? ` — solved on turn ${solved.turnNumber}`
-                          : " — unsolved";
+                          ? ` - solved on turn ${solved.turnNumber}`
+                          : " - unsolved";
                       })()}
                     </p>
                   )}
@@ -245,7 +245,7 @@ export function WhoAreYouRecap({
                               <li key={q.id} className="who-am-i-log-entry who-am-i-log-entry-guess">
                                 <p className="who-am-i-log-question">
                                   <strong>{nicknameFor(q.asking_player_id)}</strong> guessed{" "}
-                                  <strong>{q.guessedCharacterName ?? "a character"}</strong> —{" "}
+                                  <strong>{q.guessedCharacterName ?? "a character"}</strong> -{" "}
                                   <span
                                     className={
                                       wasCorrect
@@ -300,7 +300,7 @@ export function WhoAreYouRecap({
 
       {/* Host-only actions, mirroring the End Game vs Leave Game split
           elsewhere in this game: "Play Again" sends the room back to the
-          lobby (onPlayAgain — app/api/games/who-are-you/play-again/route.ts)
+          lobby (onPlayAgain - app/api/games/who-are-you/play-again/route.ts)
           for a fresh round of the SAME game; "Play More Games" sends the
           host to /games?room=CODE to swap the room to a DIFFERENT game
           (app/api/rooms/switch-game/route.ts) without anyone leaving.

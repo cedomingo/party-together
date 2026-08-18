@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   }
 
   // Drop seats that have been offline past the grace window BEFORE deciding
-  // who's playing — who-are-you's setup phase waits on every player to pick
+  // who's playing - who-are-you's setup phase waits on every player to pick
   // a character, so an abandoned tab would stall the game before it ever
   // really starts. See sweepStalePlayers in lib/rooms; keyed on
   // `last_seen_at` (a 30s heartbeat), not the twitchy `connected` flag.
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   try {
     await sweepStalePlayers(supabaseAdmin, roomId);
   } catch (err) {
-    // players.last_seen_at doesn't exist yet (migration not applied) —
+    // players.last_seen_at doesn't exist yet (migration not applied) -
     // fall back to the old behavior rather than blocking the start.
     if ((err as { code?: string })?.code !== "42703") throw err;
   }
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   if (playerIds.length < 2) {
     return NextResponse.json(
       {
-        error: `At least 2 players are needed to start the game — only ${playerIds.length} player${
+        error: `At least 2 players are needed to start the game - only ${playerIds.length} player${
           playerIds.length === 1 ? "" : "s"
         } ${playerIds.length === 1 ? "is" : "are"} still in the room.`,
       },

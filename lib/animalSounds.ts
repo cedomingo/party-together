@@ -1,5 +1,5 @@
 // Cartoonish animal sounds for the character cards, synthesized entirely in
-// the browser with the Web Audio API — no audio files, no network, no
+// the browser with the Web Audio API - no audio files, no network, no
 // licensing. Each character in the global 25-character roster maps to an
 // animal (keyed by name, see CHARACTER_ANIMAL); playCharacterSound() builds
 // a short synthesized impression of that animal (Buzzby → bee buzz, Roary →
@@ -12,7 +12,7 @@
 // wall of noise.
 //
 // The name → animal mapping is a best-effort read of the character art/names
-// (the ones that were guesses are flagged in CHARACTER_ANIMAL) — each entry
+// (the ones that were guesses are flagged in CHARACTER_ANIMAL) - each entry
 // is a one-line fix if the actual art disagrees.
 
 import type { KeyboardEvent } from "react";
@@ -82,7 +82,7 @@ export const CHARACTER_ANIMAL: Record<string, AnimalSound> = {
 // ---------------------------------------------------------------------------
 
 let audioCtx: AudioContext | null = null;
-/** Every source/LFO scheduled since the last play — cut them all when a new
+/** Every source/LFO scheduled since the last play - cut them all when a new
  *  sound starts so taps never pile up. */
 let activeSources: AudioScheduledSourceNode[] = [];
 
@@ -102,7 +102,7 @@ function stopActive(): void {
     try {
       src.stop(audioCtx.currentTime);
     } catch {
-      // Already stopped — fine.
+      // Already stopped - fine.
     }
   }
   activeSources = [];
@@ -201,7 +201,7 @@ function lfo(ctx: AudioContext, param: AudioParam, rate: number, depth: number):
 }
 
 // ---------------------------------------------------------------------------
-// One synth per animal — each is a short, quiet, recognizable cartoon take.
+// One synth per animal - each is a short, quiet, recognizable cartoon take.
 // ---------------------------------------------------------------------------
 
 const SOUNDS: Record<AnimalSound, (ctx: AudioContext, dest: AudioNode) => void> = {
@@ -603,7 +603,7 @@ const SOUNDS: Record<AnimalSound, (ctx: AudioContext, dest: AudioNode) => void> 
 // ---------------------------------------------------------------------------
 
 /** Plays the synthesized animal sound for a character, by roster name.
- *  Safe to call from any click handler — failures are swallowed so a sound
+ *  Safe to call from any click handler - failures are swallowed so a sound
  *  glitch can never break the card tap itself. */
 export function playCharacterSound(characterName: string): void {
   try {
@@ -616,7 +616,7 @@ export function playCharacterSound(characterName: string): void {
     stopActive();
     synth(ctx, ctx.destination);
   } catch {
-    // Sound is a garnish — never let it break the game.
+    // Sound is a garnish - never let it break the game.
   }
 }
 

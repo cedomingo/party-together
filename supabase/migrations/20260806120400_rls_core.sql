@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
--- Phase 1: RLS — rooms, players, characters, game_sessions, questions_log
+-- Phase 1: RLS - rooms, players, characters, game_sessions, questions_log
 -- ---------------------------------------------------------------------------
--- (who_am_i_assignments is handled separately in the next migration — it
+-- (who_am_i_assignments is handled separately in the next migration - it
 -- needs column-level grants and a masking view, not just row policies.)
 
 -- ============================================================ rooms ======
@@ -16,7 +16,7 @@ create policy rooms_select_any_authenticated
   to authenticated
   using (true);
 
--- host_player_id must be null at insert time — see bootstrap sequence in
+-- host_player_id must be null at insert time - see bootstrap sequence in
 -- the Phase 1 doc for why (players.id doesn't exist yet).
 create policy rooms_insert_any_authenticated
   on public.rooms for insert
@@ -57,7 +57,7 @@ create policy players_insert_self_join_lobby
 
 -- Self-service updates only (nickname pre-game, connected flag on
 -- disconnect/reconnect). Host-driven actions on *other* players (kick,
--- transfer host) are intentionally NOT covered by a policy yet — see
+-- transfer host) are intentionally NOT covered by a policy yet - see
 -- "Open RLS edge cases".
 create policy players_update_self
   on public.players for update
@@ -97,7 +97,7 @@ create policy game_sessions_insert_host_only
   with check (public.is_room_host(room_id));
 
 -- Any room member can update session state (turn index, phase, etc. inside
--- `state` jsonb) since the active player — not just the host — drives turn
+-- `state` jsonb) since the active player - not just the host - drives turn
 -- progression. See "Open RLS edge cases": this is coarser than ideal.
 create policy game_sessions_update_room_members
   on public.game_sessions for update
@@ -119,7 +119,7 @@ create policy questions_log_select_room_members
   );
 
 -- Only the asker can log their own question. This does NOT yet verify it's
--- actually their turn — see "Open RLS edge cases".
+-- actually their turn - see "Open RLS edge cases".
 create policy questions_log_insert_asker_only
   on public.questions_log for insert
   to authenticated
@@ -131,7 +131,7 @@ create policy questions_log_insert_asker_only
     )
   );
 
--- Any room member can update `answers` / `resolved` — needed so responders
+-- Any room member can update `answers` / `resolved` - needed so responders
 -- can write their yes/no into the shared jsonb. Same caveat as above: this
 -- doesn't yet stop one member from clobbering another's answer.
 create policy questions_log_update_room_members

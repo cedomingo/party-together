@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- "Who Are You?" Step 2: per-opponent boards (WHO-ARE-YOU-SPEC.md §4, §7)
 -- ---------------------------------------------------------------------------
--- Purely additive — no changes to rooms/players/game_sessions/characters,
+-- Purely additive - no changes to rooms/players/game_sessions/characters,
 -- who_are_you_selections/ready, or any "Who Am I?" table/policy.
 --
 -- One row per DIRECTED (viewer, target) pair: the viewer's private cross-off
@@ -10,7 +10,7 @@
 --
 -- `is_solved` is a plain boolean (NOT a generated column). The spec's draft
 -- sketched `is_guessed` as generated, then noted that a cross-table lookup
--- against who_are_you_selections can't live in a generated expression —
+-- against who_are_you_selections can't live in a generated expression -
 -- correctness is resolved server-side by the guess route (same trusted-
 -- comparison pattern as who-am-i/guess/route.ts), which writes is_solved
 -- via the service-role client. Clients never get an UPDATE grant on
@@ -39,7 +39,7 @@ create index who_are_you_boards_session_target_idx
 
 alter table public.who_are_you_boards enable row level security;
 
--- Viewer-only read — the whole row is private to the viewer. No SELECT
+-- Viewer-only read - the whole row is private to the viewer. No SELECT
 -- policy exposes another player's board at all (WHO-ARE-YOU-SPEC.md §7).
 create policy who_are_you_boards_select_own
   on public.who_are_you_boards for select
@@ -68,7 +68,7 @@ create policy who_are_you_boards_update_own
     )
   );
 
--- No INSERT/DELETE policies for authenticated — board rows are created in
+-- No INSERT/DELETE policies for authenticated - board rows are created in
 -- bulk by begin-turns/route.ts via the service-role client when the session
 -- leaves setup, and never deleted mid-game (cascade on session delete).
 
@@ -80,7 +80,7 @@ grant update (crossed_off_character_ids) on table public.who_are_you_boards to a
 -- Recap reveal: once the session has ended, every room member can read
 -- every player's locked-in pick (WHO-ARE-YOU-SPEC.md §9). During an
 -- in-progress game the underlying who_are_you_selections table stays
--- owner-only — this view simply returns zero rows until ended_at is set,
+-- owner-only - this view simply returns zero rows until ended_at is set,
 -- so there is no in-progress path that could leak another player's
 -- character_id through it.
 -- ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ grant select on public.who_are_you_recap to authenticated;
 
 comment on view public.who_are_you_recap is
   'Post-game reveal of who_are_you_selections.character_id for every player '
-  'in the room. Returns no rows while the session is still in progress — '
+  'in the room. Returns no rows while the session is still in progress - '
   'the owner-only RLS on who_are_you_selections remains the only in-game '
   'read path for picks.';
 

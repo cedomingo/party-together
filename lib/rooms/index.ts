@@ -6,7 +6,7 @@
 // reverse.
 //
 // All functions take a Supabase client as their first argument (or inside
-// their params object) rather than constructing one internally — this lets
+// their params object) rather than constructing one internally - this lets
 // the same logic run from the browser client (Client Components), the
 // server client (Server Actions/Route Handlers), or the admin client (cron
 // cleanup), while staying agnostic about *how* that client authenticates.
@@ -24,11 +24,11 @@ export interface Room {
   id: string;
   code: string;
   host_player_id: string | null;
-  /** Null until the host picks a game on /games — rooms are created as a
+  /** Null until the host picks a game on /games - rooms are created as a
    * game-less shell (code + max players) and the game is assigned
    * afterwards via the switch-game route (setRoomGame). Game-less rooms
    * are joinable like any other (the joiner is redirected to
-   * /games?room=CODE — there's no room URL yet); the game start routes
+   * /games?room=CODE - there's no room URL yet); the game start routes
    * refuse a mismatched/null game_id. */
   game_id: string | null;
   status: RoomStatus;
@@ -76,7 +76,7 @@ export const ROOM_EXPIRY_HOURS = 24;
 // stale-player sweep treats their seat as abandoned and removes it
 // (sweepStalePlayers). Deliberately ~3x PLAYER_HEARTBEAT_MS: browsers
 // throttle background-tab timers to roughly once a minute, so a player who
-// merely switched tabs still lands comfortably inside this window — only a
+// merely switched tabs still lands comfortably inside this window - only a
 // page that has truly stopped running (closed tab, dead network) drifts
 // past it.
 export const OFFLINE_GRACE_MS = 90_000;
@@ -109,7 +109,7 @@ export function normalizeRoomCode(code: string): string {
 /**
  * Strips characters no legitimate nickname/question needs and that are
  * classic abuse vectors: angle brackets (keeps raw `<script>`-shaped
- * strings out of stored data — defense in depth, since these are only
+ * strings out of stored data - defense in depth, since these are only
  * ever rendered as React text content, which already escapes everything),
  * C0/C1 control characters (NUL and friends), and zero-width/bidi-override
  * characters (used to spoof or obscure displayed text). Shared by
@@ -150,7 +150,7 @@ function expiryTimestamp(hours: number = ROOM_EXPIRY_HOURS): string {
 /**
  * Falls back to 0 for anything not a valid in-range index (including
  * "in range for an older/shorter build of lib/avatar.ts") rather than
- * throwing — an out-of-range avatar index isn't a reason to fail the
+ * throwing - an out-of-range avatar index isn't a reason to fail the
  * whole create/join, unlike an empty nickname. `getMushroom`/`getAccessory`
  * apply the same 0-fallback on read, so this just means an odd value never
  * makes it into storage in the first place.
@@ -164,7 +164,7 @@ function clampAvatarIndex(value: unknown, length: number): number {
 // -------------------------------------------------------------- identity --
 
 /**
- * Every player is a real Supabase Anonymous Auth session (SPEC.md §2) — no
+ * Every player is a real Supabase Anonymous Auth session (SPEC.md §2) - no
  * email/password/OAuth, but a real `auth.uid()` so RLS can tell one
  * browser's session apart from another's. Idempotent: if a session already
  * exists, reuses it rather than minting a new anonymous user.
@@ -236,7 +236,7 @@ export interface CreateRoomResult {
 }
 
 /**
- * Bootstrap sequence (see supabase/PHASE1_NOTES.md — "chicken-and-egg with
+ * Bootstrap sequence (see supabase/PHASE1_NOTES.md - "chicken-and-egg with
  * host_player_id"): a room can't be created with its host already set,
  * because the host's player row doesn't exist until the room does.
  *   1. insert the room with host_player_id = null
@@ -253,7 +253,7 @@ export async function createRoom({
   accessoryIndex,
 }: CreateRoomParams): Promise<CreateRoomResult> {
   // ensureAnonSession already resolves (or mints) the anonymous session and
-  // returns its user id — a second getUser() here was a redundant network
+  // returns its user id - a second getUser() here was a redundant network
   // round trip on every create, which is exactly the kind of latency that
   // makes the create click feel unresponsive.
   const userId = await ensureAnonSession(supabase);
@@ -283,7 +283,7 @@ export async function createRoom({
       break;
     }
     lastError = error;
-    // 23505 = unique_violation — only worth retrying a code collision.
+    // 23505 = unique_violation - only worth retrying a code collision.
     if ((error as { code?: string } | null)?.code !== "23505") {
       throw new RoomError(error?.message ?? "Failed to create room.");
     }
@@ -313,7 +313,7 @@ export async function createRoom({
     throw new RoomError(playerError?.message ?? "Failed to create the host's player row.");
   }
 
-  // Step 3 of the bootstrap sequence documented above — point the room at
+  // Step 3 of the bootstrap sequence documented above - point the room at
   // its host now that the host's player row exists. Covered by
   // rooms_update_host_only (RLS): is_room_host(id) is satisfied because
   // the row we just inserted has is_host = true and auth_id = auth.uid().
@@ -334,7 +334,7 @@ export async function createRoom({
 export interface JoinRoomResult {
   roomId: string;
   code: string;
-  /** null until the host picks a game (game-less shell room) — callers
+  /** null until the host picks a game (game-less shell room) - callers
    * that redirect by this must send the joiner to /games?room=CODE instead
    * of building a room URL when it's null. */
   gameId: string | null;
@@ -345,7 +345,7 @@ export interface JoinRoomResult {
 
 /**
  * Joins by code, or reconnects if this anonymous session already has a
- * player row in the room (survives page refresh — see SPEC.md §7 & §11).
+ * player row in the room (survives page refresh - see SPEC.md §7 & §11).
  * New joins are only possible while the room is still `lobby`; RLS enforces
  * this independently (`players_insert_self_join_lobby`), so the status
  * check here is purely for a friendlier error message.
@@ -374,7 +374,7 @@ export async function joinRoomByCode(
     throw new RoomNotFoundError(`No room found for code "${normalizeRoomCode(code)}".`);
   }
 
-  // A game-less room joins exactly like a game-assigned one — all the
+  // A game-less room joins exactly like a game-assigned one - all the
   // checks below (reconnect, lobby status, room-full cap) are game-agnostic.
   // The joiner just gets redirected to /games?room=CODE by their caller
   // (JoinRoomResult.gameId is null) until the host picks a game.
@@ -410,13 +410,13 @@ export async function joinRoomByCode(
 
   if (room.status !== "lobby") {
     throw new RoomAlreadyStartedError(
-      "This room has already started — new players can't join mid-game."
+      "This room has already started - new players can't join mid-game."
     );
   }
 
   // Room-full check (SPEC.md §7: "host can optionally set [a max player
   // cap]"; §11: "clean ... error states for ... room-full"). Only applies
-  // to *new* joins — an existing player reconnecting (handled above,
+  // to *new* joins - an existing player reconnecting (handled above,
   // before this point) always gets their slot back even if the room later
   // filled up around them. This is a friendly-error backstop, not the
   // actual access boundary: `players_insert_self_join_lobby` (see
@@ -460,7 +460,7 @@ export async function joinRoomByCode(
 
   if (insertError || !playerRow) {
     // The RLS guard above can also reject this insert directly (a race
-    // between the count check and another player's concurrent join) —
+    // between the count check and another player's concurrent join) -
     // Postgres reports that as a generic RLS policy violation (42501), not
     // a distinguishable error shape, so it surfaces as a room-full message
     // too rather than a confusing raw DB error.
@@ -474,7 +474,7 @@ export async function joinRoomByCode(
     throw new RoomError(insertError?.message ?? "Failed to join room.");
   }
 
-  // Best-effort activity refresh — a room that's actively gaining players
+  // Best-effort activity refresh - a room that's actively gaining players
   // shouldn't expire mid-lobby. Not fatal if it fails.
   await touchRoomExpiry(supabase, room.id).catch(() => undefined);
 
@@ -489,7 +489,7 @@ export async function joinRoomByCode(
 
 /**
  * Host-only assignment of which game a room will play (enforced by the
- * `rooms_update_host_only` RLS policy — a non-host update simply matches
+ * `rooms_update_host_only` RLS policy - a non-host update simply matches
  * zero rows). Used by the switch-game route when the host picks a game on
  * /games?room=CODE: the room may have been created as a game-less shell
  * (see `createRoom`) or be flipping from a finished game. Throws a
@@ -522,7 +522,7 @@ export async function setPlayerConnected(
 }
 
 /**
- * Marks this session's player row as alive — the heartbeat that keeps
+ * Marks this session's player row as alive - the heartbeat that keeps
  * `last_seen_at` fresh so the stale-player sweep never mistakes an
  * actively-open room page for an abandoned seat. Callers treat failures as
  * best-effort (a missed ping just makes the sweep see an older timestamp).
@@ -537,8 +537,8 @@ export async function touchPlayerSeen(supabase: SupabaseClient, playerId: string
 }
 
 /**
- * Removes players whose `last_seen_at` is older than `graceMs` — seats that
- * have been offline long enough to be considered abandoned — so the lobby
+ * Removes players whose `last_seen_at` is older than `graceMs` - seats that
+ * have been offline long enough to be considered abandoned - so the lobby
  * roster, the max_players cap, and the game start all reflect only the
  * people actually here. The host is never swept (is_host rows are
  * excluded); callers only run this for `lobby` rooms (the sweep route and
@@ -547,7 +547,7 @@ export async function touchPlayerSeen(supabase: SupabaseClient, playerId: string
  * (`players_delete_self`). Returns the ids of the removed players.
  *
  * If the players.last_seen_at migration hasn't been applied yet, the delete
- * fails with Postgres code 42703 (undefined column) — carried on the thrown
+ * fails with Postgres code 42703 (undefined column) - carried on the thrown
  * RoomError as `.code` so callers can fall back to the old behavior rather
  * than breaking game start.
  */
@@ -575,12 +575,12 @@ export async function sweepStalePlayers(
 }
 
 /**
- * Host-only (enforced by the `rooms_update_host_only` RLS policy — a
+ * Host-only (enforced by the `rooms_update_host_only` RLS policy - a
  * non-host caller's update simply matches zero rows). Deliberately just
  * flips `status`; SPEC.md Phase 2 wants this as a no-op-ish stub with zero
  * game logic. Once flipped, `players_insert_self_join_lobby` automatically
  * blocks new joins (it requires status = 'lobby'), which is what "host can
- * lock the room once the game starts" (§7) reduces to — no separate lock
+ * lock the room once the game starts" (§7) reduces to - no separate lock
  * flag needed.
  */
 export async function startGame(supabase: SupabaseClient, roomId: string): Promise<void> {
@@ -592,7 +592,7 @@ export async function startGame(supabase: SupabaseClient, roomId: string): Promi
   if (error) throw new RoomError(error.message);
 }
 
-/** Cron-only (SPEC.md §7). Expects the service-role admin client — there is
+/** Cron-only (SPEC.md §7). Expects the service-role admin client - there is
  * no delete policy for `rooms` under normal RLS on purpose (see
  * supabase/migrations/20260806120400_rls_core.sql).
  */

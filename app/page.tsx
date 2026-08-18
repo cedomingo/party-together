@@ -1,12 +1,12 @@
 // Landing page: lets a visitor create or join a room. Reads from
-// /lib/games-registry.ts so it automatically picks up new games — no
+// /lib/games-registry.ts so it automatically picks up new games - no
 // game-specific code should ever be added directly to this file
 // (SPEC.md §3, §7).
 //
 // The create flow is shell-first: "Create a room" makes a game-less room
 // (just a code) and sends the host to /games?room=CODE, where they can
 // share the code and pick a game (app/components/CreateRoomShellForm.tsx +
-// app/games/page.tsx). Game selection deliberately does NOT happen here —
+// app/games/page.tsx). Game selection deliberately does NOT happen here -
 // the games are listed on the dedicated /games page.
 
 import Link from "next/link";
@@ -24,7 +24,7 @@ export default function HomePage() {
 
       <RoomForms shellCreate />
 
-      {games.length === 0 && <p className="muted">No games are registered yet — nothing to play just yet.</p>}
+      {games.length === 0 && <p className="muted">No games are registered yet - nothing to play just yet.</p>}
     </main>
   );
 }

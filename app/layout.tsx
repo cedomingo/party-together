@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 // Explicit rather than relying on Next's default (SPEC.md §11 mobile-first):
 // most players open a shared room link on a phone, so this needs to be
 // right, not just "probably fine by default." `maximum-scale`/
-// `user-scalable` are intentionally left unset — pinch-zoom must keep
+// `user-scalable` are intentionally left unset - pinch-zoom must keep
 // working for low-vision players (WCAG 1.4.4), so this only fixes the
 // initial layout width/zoom, never disables zooming.
 export const viewport: Viewport = {
@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <PaperBorderAuto />
-        {/* Visually hidden until focused (see .skip-link in globals.css) —
+        {/* Visually hidden until focused (see .skip-link in globals.css) -
             SPEC.md §11 accessibility: lets a keyboard user jump past the
             repeated header controls straight to each page's <main id=
             "main-content">, instead of tabbing through them every time. */}

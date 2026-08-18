@@ -4,10 +4,10 @@
 -- Root cause (reproduced against a clean Postgres 16 instance, same policy/
 -- grant shape as this table, before proposing this fix):
 --
---   who_am_i_assignments has RLS enabled with exactly ONE policy —
+--   who_am_i_assignments has RLS enabled with exactly ONE policy -
 --   who_am_i_assignments_update_own_row (UPDATE only), from
 --   20260806120500_who_am_i_identity_protection.sql. There has never been a
---   SELECT policy on this table (by design — see that migration's header:
+--   SELECT policy on this table (by design - see that migration's header:
 --   "No SELECT grant on the base table at all", to force all reads through
 --   the who_am_i_board masking view).
 --

@@ -6,7 +6,7 @@ import { applyPaperBorder, pickPaperBorderId } from "@/lib/paperBorder";
 /** Containers whose rendered size changes (form height, expandable log,
  *  responsive re-layout of the Who Am I columns, etc.) get the closest-
  *  matching border PNG via ResizeObserver. The hard-coded background-image
- *  each of these has in globals.css is just the no-JS fallback — this
+ *  each of these has in globals.css is just the no-JS fallback - this
  *  runtime pass overrides it with the best-fitting asset for the actual
  *  size, so strokes never look stretched. */
 const AUTO_SELECTORS = [

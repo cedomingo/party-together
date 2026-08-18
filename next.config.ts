@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // Platform-wide Next.js config.
-// Game-specific config must NOT live here — see /games/<game>/config.ts instead.
+// Game-specific config must NOT live here - see /games/<game>/config.ts instead.
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {

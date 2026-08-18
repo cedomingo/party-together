@@ -1,4 +1,4 @@
-/** Hand-drawn frame assets under public/ui/elements/borders/ — each PNG is
+/** Hand-drawn frame assets under public/ui/elements/borders/ - each PNG is
  *  authored at a specific size; pick the closest aspect ratio so the stroke
  *  does not look stretched when scaled to the container. */
 export const PAPER_BORDER_SIZES = [

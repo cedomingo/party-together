@@ -1,6 +1,6 @@
 // Room creation endpoint (SPEC.md §7 flow, §10 "server-side rate limiting
 // on room creation ... endpoints"). Before Phase 9, `createRoom` (lib/rooms)
-// was called straight from the browser's Supabase client — RLS scoped what
+// was called straight from the browser's Supabase client - RLS scoped what
 // it could write, but nothing server-side could throttle *how often* it
 // could be called, which is exactly the "room-flooding" spam SPEC.md §10
 // calls out. This route moves that call behind a route handler purely so

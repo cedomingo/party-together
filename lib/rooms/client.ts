@@ -1,7 +1,7 @@
 "use client";
 
 // Browser-side wrappers for the room create/join API routes
-// (app/api/rooms/{create,join}/route.ts — SPEC.md §10). Phase 9 moved the
+// (app/api/rooms/{create,join}/route.ts - SPEC.md §10). Phase 9 moved the
 // actual `createRoom`/`joinRoomByCode` calls (lib/rooms/index.ts) behind
 // route handlers so they could be rate-limited server-side; these
 // functions are what Client Components call instead, keeping the
@@ -36,7 +36,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export async function createRoomViaApi(params: {
-  /** Optional — the home page creates a game-less shell and the host picks
+  /** Optional - the home page creates a game-less shell and the host picks
    * the game afterwards on /games; per-game landing pages pass it up
    * front. */
   gameId?: string | null;

@@ -7,7 +7,7 @@
 //   - a correct guess solves that pairing; the asker keeps going on the rest
 //   - finishedAskerIds tracks players who've met the active mode's win condition
 //
-// No React, no I/O — shared by begin-turns / question / answer / done / guess
+// No React, no I/O - shared by begin-turns / question / answer / done / guess
 // routes and RoomView.
 
 import type { WhoAreYouBaseMode } from "@/games/who-are-you/logic/sessionState";
@@ -25,7 +25,7 @@ export interface WhoAreYouTurnsState {
   phase: "turns";
   turnOrder: string[];
   baseMode: WhoAreYouBaseMode;
-  /** Independent of baseMode — WHO-ARE-YOU-SPEC.md §8 "First Win Ends Game". */
+  /** Independent of baseMode - WHO-ARE-YOU-SPEC.md §8 "First Win Ends Game". */
   firstWinEnds: boolean;
   currentTurnIndex: number;
   turnPhase: WhoAreYouTurnPhase;
@@ -182,7 +182,7 @@ export function currentAskTargetId(state: WhoAreYouTurnsState): string | null {
 /**
  * Mode-aware game-end check (WHO-ARE-YOU-SPEC.md §8):
  *   - firstWinEnds: over the instant any player finishes
- *   - guess-everyone (default end): last-standing-loses — over once every
+ *   - guess-everyone (default end): last-standing-loses - over once every
  *     player but (at most) one has finished
  *   - rival-match (default end): over once every player has finished their
  *     rival matchup
@@ -315,7 +315,7 @@ export function advanceTurn(state: WhoAreYouTurnsState): WhoAreYouTurnsState {
  * (WHO-ARE-YOU-SPEC.md §5). Allowed only while phase is "asking" for that
  * specific opponent (before a question has been submitted for them).
  *
- * Unlike Who Am I, a wrong guess does NOT end the whole turn — it only
+ * Unlike Who Am I, a wrong guess does NOT end the whole turn - it only
  * wastes this opponent's slot. A correct guess solves that pairing and
  * the asker continues with remaining opponents.
  */
@@ -332,7 +332,7 @@ export function submitGuess(
     throw new TurnStateError("It isn't your turn to guess.");
   }
   if (state.finishedAskerIds.includes(guesserId)) {
-    throw new TurnStateError("You've already finished — no more asking or guessing.");
+    throw new TurnStateError("You've already finished - no more asking or guessing.");
   }
   const expectedTarget = currentAskTargetId(state);
   if (!expectedTarget || expectedTarget !== targetId) {
@@ -355,7 +355,7 @@ export function submitGuess(
         hasPlayerFinished(state.turnOrder, state.baseMode, solvedPairings, id)
       ),
     };
-    // Keep answeringOrder as-is and advance the index past this slot —
+    // Keep answeringOrder as-is and advance the index past this slot -
     // filtering mid-turn would desync answeringIndex. Same as a normal answer.
   }
 

@@ -5,7 +5,7 @@
 // that already lives in games/who-am-i/components/RoomView.tsx. Postgres
 // remains the source of truth for turn state and the question log (see
 // that file's header, and SPEC.md §9's closing line: "Realtime broadcast
-// is for UX responsiveness, not the source of truth") — this channel
+// is for UX responsiveness, not the source of truth") - this channel
 // exists purely to shave the replication round-trip off of what
 // postgres_changes would otherwise deliver a moment later, plus carry one
 // thing that is *never* persisted anywhere at all: "player is typing a
@@ -29,21 +29,21 @@
 //                   that state, right after the API call that wrote it
 //                   succeeds. Applying it on other clients is just pulling
 //                   forward a state update they'd receive a moment later
-//                   via postgres_changes anyway — `onTurnSync` here and the
+//                   via postgres_changes anyway - `onTurnSync` here and the
 //                   postgres_changes handler both ultimately call the same
 //                   `setTurnState`, so a slightly-late postgres_changes
 //                   delivery of identical state is a harmless no-op, not a
 //                   second source of truth.
 //   - "turn-event" Small ephemeral toasts ("X asked a question", "Y is
-//                   done — turn passed") for SPEC.md §9's "I'm Done
+//                   done - turn passed") for SPEC.md §9's "I'm Done
 //                   events". Display-only; carries no state a reconnecting
 //                   client would need. A refresh rehydrates entirely from
 //                   Postgres (RoomView.tsx's initial-load effect) and
-//                   simply never sees this toast history — that's fine, it
+//                   simply never sees this toast history - that's fine, it
 //                   was never meant to persist.
 //
 // `self: false` on the channel config means the sending client never
-// receives its own broadcasts back — it already applied the same update
+// receives its own broadcasts back - it already applied the same update
 // locally from the API response, so echoing it would just be redundant
 // work, not a correctness issue either way.
 
@@ -56,10 +56,10 @@ const TURN_SYNC_EVENT = "turn-sync";
 const TURN_EVENT_EVENT = "turn-event";
 
 /** How long a "started typing" signal is trusted before it's assumed
- *  stale — see file header. */
+ *  stale - see file header. */
 const TYPING_TIMEOUT_MS = 4000;
 
-/** Toasts kept around at once — this is a live feed, not a log (that's
+/** Toasts kept around at once - this is a live feed, not a log (that's
  *  questions_log/Postgres's job); old ones just fall off. */
 const MAX_LIVE_EVENTS = 5;
 
@@ -72,10 +72,16 @@ export type WhoAmITurnEventKind =
   | "game-ended";
 
 export interface WhoAmITurnEvent {
-  /** Not a DB id — only needs to be a stable React key for this toast. */
+  /** Not a DB id - only needs to be a stable React key for this toast. */
   id: string;
   kind: WhoAmITurnEventKind;
   playerId: string;
+  /** Set on guess events: the name of the character that was guessed, so
+   *  the feed can read "X guessed Dragon - Incorrect." instead of a bare
+   *  "X guessed - not quite." (safe to share: the guesser picked it
+   *  themselves, and it only matches the secret identity when the guess
+   *  is correct). */
+  characterName?: string;
 }
 
 interface TypingBroadcastPayload {
@@ -90,6 +96,7 @@ interface TurnSyncBroadcastPayload {
 interface TurnEventBroadcastPayload {
   kind: WhoAmITurnEventKind;
   playerId: string;
+  characterName?: string;
 }
 
 function channelNameForSession(sessionId: string): string {
@@ -161,11 +168,11 @@ export function useWhoAmIBroadcast({
         onTurnSyncRef.current(state);
       })
       .on("broadcast", { event: TURN_EVENT_EVENT }, ({ payload }) => {
-        const { kind, playerId } = payload as TurnEventBroadcastPayload;
+        const { kind, playerId, characterName } = payload as TurnEventBroadcastPayload;
         setLiveEvents((prev) =>
           [
             ...prev,
-            { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, kind, playerId },
+            { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, kind, playerId, characterName },
           ].slice(-MAX_LIVE_EVENTS)
         );
       })
@@ -180,7 +187,7 @@ export function useWhoAmIBroadcast({
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-    // sessionId alone drives the subscription lifecycle — same rationale
+    // sessionId alone drives the subscription lifecycle - same rationale
     // as the postgres_changes effect in RoomView.tsx (keyed on ids, not
     // objects, to avoid tearing the channel down on every update it
     // receives).
@@ -207,11 +214,11 @@ export function useWhoAmIBroadcast({
   }, []);
 
   const broadcastTurnEvent = useCallback(
-    (kind: WhoAmITurnEventKind) => {
+    (kind: WhoAmITurnEventKind, characterName?: string) => {
       channelRef.current?.send({
         type: "broadcast",
         event: TURN_EVENT_EVENT,
-        payload: { kind, playerId: currentPlayerId } satisfies TurnEventBroadcastPayload,
+        payload: { kind, playerId: currentPlayerId, characterName } satisfies TurnEventBroadcastPayload,
       });
     },
     [currentPlayerId]

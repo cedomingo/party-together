@@ -1,6 +1,6 @@
 // Host manually ends the game (SPEC.md §8 "Turn Loop" point 7: "Game ends
 // when all players have guessed correctly, OR host manually ends it.").
-// This is the second half of that condition — the first half (auto-end
+// This is the second half of that condition - the first half (auto-end
 // once every player is solved) lives in guess/route.ts.
 //
 // Only the room's host may call this. Unlike guess/route.ts's own
@@ -8,7 +8,7 @@
 // caller genuinely is the host here, so their own cookie-authenticated
 // client already satisfies both `rooms_update_host_only` and
 // `game_sessions_update_room_members` (see supabase/migrations/
-// 20260806120400_rls_core.sql) — see the doc comment on `endGameSession`
+// 20260806120400_rls_core.sql) - see the doc comment on `endGameSession`
 // in _lib/turnSession.ts for the full reasoning on why each end-path uses
 // the client it does.
 

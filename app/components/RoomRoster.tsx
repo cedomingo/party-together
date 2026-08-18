@@ -1,10 +1,10 @@
 "use client";
 
-// Shared lobby roster — the "Players (N)" section with avatar, online/
+// Shared lobby roster - the "Players (N)" section with avatar, online/
 // offline status dot, host badge, "(you)" marker, and disconnected note.
 // Used by RoomClient (the game room's lobby) and GamesListing (the
 // /games?room=CODE waiting room) so both render the exact same markup and
-// CSS (.player-list / .player-row / .status-dot / .badge — see globals.css)
+// CSS (.player-list / .player-row / .status-dot / .badge - see globals.css)
 // instead of two divergent copies of the same concept.
 
 import { AvatarIcon } from "@/app/components/AvatarIcon";
@@ -18,7 +18,7 @@ export function RoomRoster({
   players: Player[];
   /** Player ids currently tracked online by the room-presence channel. */
   onlineIds: Set<string>;
-  /** This session's own player row id, if a member — drives the "(you)" marker. */
+  /** This session's own player row id, if a member - drives the "(you)" marker. */
   currentPlayerId: string | null;
 }) {
   return (

@@ -1,14 +1,14 @@
 "use client";
 
 // Platform-core "Create Room" form for the SHELL-first flow (SPEC.md §7,
-// game-agnostic). It creates a room with NO game attached yet — just the
-// room code + max players — and sends the host to /games?room=CODE, where
+// game-agnostic). It creates a room with NO game attached yet - just the
+// room code + max players - and sends the host to /games?room=CODE, where
 // they can share the code and pick a game (app/components/GamesListing.tsx
 // + app/api/rooms/switch-game/route.ts). The game is chosen AFTER
 // creation, never here, so this form deliberately has no game picker.
 //
 // `nickname` comes from the shared avatar creator (app/components/AvatarCreator.tsx
-// via RoomForms.tsx) rather than a field of its own — the avatar creator
+// via RoomForms.tsx) rather than a field of its own - the avatar creator
 // above already asks for a name once, and everything on this page shares it.
 
 import { useState, type FormEvent } from "react";
@@ -41,7 +41,7 @@ export function CreateRoomShellForm({
     try {
       const parsedMax = maxPlayers.trim() ? Number(maxPlayers) : null;
       const { code } = await createRoomViaApi({
-        // No gameId — the room is created as a game-less shell; the host
+        // No gameId - the room is created as a game-less shell; the host
         // picks the game on /games?room=CODE afterwards.
         nickname,
         maxPlayers: parsedMax && parsedMax > 0 ? parsedMax : null,
@@ -78,7 +78,7 @@ export function CreateRoomShellForm({
 
       {/* Deliberately NOT gated on avatar-image preloading: the avatar
           indices are already known (localStorage/defaults) and nothing
-          about creation needs the PNGs — the ~29 MB preload only feeds the
+          about creation needs the PNGs - the ~29 MB preload only feeds the
           preview. Blocking the CTA on it made create/join feel dead for
           seconds on slow connections. The preview still shows its skeleton
           until assets arrive (AvatarCreator's assetsReady). */}

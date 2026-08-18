@@ -1,20 +1,20 @@
 // Submit a question directed at your current 1:1 target on your turn
-// (SPEC.md §8 "Turn Loop" point 2, reinterpreted for real 1:1 targeting —
+// (SPEC.md §8 "Turn Loop" point 2, reinterpreted for real 1:1 targeting -
 // see games/who-am-i/logic/turnState.ts's file header). Only the current
 // asker (per the session's turn state) may call this, and only while the
-// loop is in the "asking" phase — see
+// loop is in the "asking" phase - see
 // app/api/games/who-am-i/_lib/turnSession.ts for how the caller/session are
 // resolved, and games/who-am-i/logic/turnState.ts for the phase transition
 // (`startAnswering`) this route drives.
 //
-// The target isn't taken from the request body — it's derived server-side
+// The target isn't taken from the request body - it's derived server-side
 // from `currentAskTargetId(state)`, the same turn state this route already
 // has to trust for "whose turn is it to ask." That way a compromised or
 // buggy client can't name a different target than the one the turn loop
 // actually has queued up.
 //
 // Writes go through the caller's own cookie-authenticated client, not the
-// admin client — `questions_log_insert_asker_only` (RLS) already requires
+// admin client - `questions_log_insert_asker_only` (RLS) already requires
 // asking_player_id to equal the caller's own player id in this room (and,
 // as of the targeted-questions migration, that target_player_id names an
 // actual member of that room), and `game_sessions_update_room_members`
@@ -41,7 +41,7 @@ import { stripUnsafeChars } from "@/lib/rooms";
 const MAX_QUESTION_LENGTH = 280;
 
 // SPEC.md §10: "rate-limit question submissions ... server-side ... to
-// prevent spam-turn abuse." Keyed by player, not IP — the turn loop
+// prevent spam-turn abuse." Keyed by player, not IP - the turn loop
 // already only lets one player ask at a time, so this is purely a backstop
 // against a single (possibly compromised/scripted) session hammering the
 // endpoint, not a substitute for the turn-order check below.

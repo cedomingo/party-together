@@ -3,20 +3,20 @@
 -- ---------------------------------------------------------------------------
 -- "Server-side rate limiting on room creation, join, question, and answer
 -- submission endpoints" needs to survive across Vercel's serverless
--- instances — an in-memory counter in the route handler wouldn't (every
+-- instances - an in-memory counter in the route handler wouldn't (every
 -- cold start / region gets its own memory). Postgres is already the
 -- project's one shared, durable store (SPEC.md §2), so rate limits live
 -- here as a small fixed-window counter table, rather than pulling in an
 -- external dependency (e.g. Upstash Redis) purely for this.
 --
--- This is deliberately the *backstop*, not the first line of defense — the
+-- This is deliberately the *backstop*, not the first line of defense - the
 -- Cloudflare WAF/rate-limit/bot-fight rules in front of Vercel (see
 -- /cloudflare/README.md) are what should absorb most abuse before it ever
 -- reaches a route handler. This table protects the app even if that edge
 -- layer is misconfigured, disabled, or bypassed.
 
 create table public.rate_limits (
-  -- e.g. "room-create:203.0.113.4" or "who-am-i-question:<player_id>" —
+  -- e.g. "room-create:203.0.113.4" or "who-am-i-question:<player_id>" -
   -- callers namespace their own keys (see lib/rateLimit.ts).
   key text primary key,
   window_start timestamptz not null default now(),
@@ -27,7 +27,7 @@ create table public.rate_limits (
 -- table is completely inaccessible to the anon/authenticated roles (i.e.
 -- every normal client request), regardless of what a route handler's own
 -- application logic does or doesn't check. Only the service-role client
--- (which bypasses RLS entirely) can read/write it — see lib/rateLimit.ts,
+-- (which bypasses RLS entirely) can read/write it - see lib/rateLimit.ts,
 -- which always calls `rate_limit_hit` via `createSupabaseAdminClient()`.
 alter table public.rate_limits enable row level security;
 
@@ -36,14 +36,14 @@ alter table public.rate_limits enable row level security;
 -- otherwise reports it as disallowed without incrementing further. `for
 -- update` takes a row lock on this key's own row so concurrent hits from
 -- the *same* key (e.g. a double-submit) serialize instead of racing on the
--- read-modify-write — separate keys never contend with each other.
+-- read-modify-write - separate keys never contend with each other.
 --
 -- security definer + pinned search_path for the same reason as the Phase 1
 -- RLS helper functions (supabase/migrations/20260806120300_helper_functions.sql):
 -- lets the function read/write a table RLS otherwise locks everyone out of,
 -- without a search_path-hijacking risk. Only ever invoked via the
 -- service-role client in practice (see revoke/grant below), so RLS would
--- already be bypassed either way — this is belt-and-suspenders.
+-- already be bypassed either way - this is belt-and-suspenders.
 create or replace function public.rate_limit_hit(
   p_key text,
   p_limit int,
@@ -71,7 +71,7 @@ begin
 
   v_elapsed := greatest(extract(epoch from (v_now - v_window_start))::int, 0);
 
-  -- Window expired — start a fresh one for this key.
+  -- Window expired - start a fresh one for this key.
   if v_elapsed >= p_window_seconds then
     v_window_start := v_now;
     v_count := 0;
@@ -79,7 +79,7 @@ begin
   end if;
 
   if v_count >= p_limit then
-    -- Already at/over the limit for the current window — don't increment
+    -- Already at/over the limit for the current window - don't increment
     -- further, just report how long until it resets.
     update public.rate_limits
       set window_start = v_window_start
@@ -105,7 +105,7 @@ grant execute on function public.rate_limit_hit(text, int, int) to service_role;
 -- Opportunistic cleanup for the cron route (lib/rateLimit.ts ->
 -- cleanupStaleRateLimits, called from app/api/cron/cleanup-rooms), so this
 -- table doesn't grow unbounded as new IPs/players show up over time. A key
--- is safe to drop once its window has been over for a while — nothing
+-- is safe to drop once its window has been over for a while - nothing
 -- reads a row except `rate_limit_hit`, which just re-creates it fresh via
 -- the `on conflict do nothing` insert above.
 create or replace function public.cleanup_stale_rate_limits(p_older_than_seconds int)

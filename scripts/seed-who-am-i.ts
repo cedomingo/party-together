@@ -28,7 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // Deliberately NOT importing lib/supabase/admin.ts here. That helper pulls
 // in the `server-only` package, which only resolves to a no-op under
-// Next.js's bundler ("react-server" export condition) — run directly via
+// Next.js's bundler ("react-server" export condition) - run directly via
 // `tsx` (a plain Node process, no Next.js/webpack involved), it always
 // throws. This script builds the same privileged (service-role) client
 // inline instead, scoped to this standalone script.
@@ -68,7 +68,7 @@ const MANIFEST_PATH = path.join(
 const IMAGE_URL_PREFIX = "/characters/who-am-i/images";
 
 // tsx doesn't auto-load .env.local the way `next dev`/`next build` do, so
-// this script loads it itself (only filling in vars not already set —
+// this script loads it itself (only filling in vars not already set -
 // real env vars, e.g. in CI, always win). No new dependency: a `.env.local`
 // is just KEY=VALUE lines.
 function loadDotEnvLocal() {
@@ -118,7 +118,7 @@ function loadManifest(): ManifestEntry[] {
       entry.imageFile.trim() === ""
     ) {
       throw new Error(
-        `manifest.json entry ${i} is malformed — expected {id, name, imageFile} strings, got: ${JSON.stringify(
+        `manifest.json entry ${i} is malformed - expected {id, name, imageFile} strings, got: ${JSON.stringify(
           entry
         )}`
       );
@@ -131,7 +131,7 @@ function loadManifest(): ManifestEntry[] {
     if (seenNames.has(entry.name)) {
       throw new Error(
         `manifest.json has a duplicate character name: "${entry.name}". ` +
-          "Names must be unique — the seed script upserts by name."
+          "Names must be unique - the seed script upserts by name."
       );
     }
     seenNames.add(entry.name);

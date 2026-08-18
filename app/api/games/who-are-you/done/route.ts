@@ -1,4 +1,4 @@
-// "I'm Done" — asker ends their turn once every opponent slot this turn
+// "I'm Done" - asker ends their turn once every opponent slot this turn
 // has been asked or guessed (WHO-ARE-YOU-SPEC.md §6).
 
 import { NextResponse } from "next/server";

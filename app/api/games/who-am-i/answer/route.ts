@@ -1,23 +1,23 @@
 // Submit a yes/no answer to the question directed at you, one responder at
 // a time (SPEC.md §8 "Turn Loop" point 3, reinterpreted for real 1:1
-// targeting — see games/who-am-i/logic/turnState.ts's file header). Only
+// targeting - see games/who-am-i/logic/turnState.ts's file header). Only
 // the player whose turn it is to answer (per the session's turn state) may
 // call this, and only while the loop is in the "answering" phase.
 //
 // `answers` is a jsonb map on questions_log ({ player_id: 'yes'|'no' }),
 // not a normal relational column, so "add my answer" is a read-modify-
-// write rather than a single atomic update — same trade-off the
+// write rather than a single atomic update - same trade-off the
 // `questions_log_update_room_members` RLS policy comment already flags
 // ("this doesn't yet stop one member from clobbering another's answer").
 // This route narrows that window as much as it reasonably can without a
 // bigger schema change: it re-checks the responder-order invariant against
 // the state it just read, confirms the active question's own
 // `target_player_id` is actually the caller (not just that turnState
-// *thinks* it's their turn — belt and suspenders against the two ever
+// *thinks* it's their turn - belt and suspenders against the two ever
 // drifting apart), and rejects a second answer from the same player for
 // the same question outright. With one question now always aimed at
 // exactly one player, `answers` should only ever end up with a single
-// entry, but the map shape is kept as-is — see the targeted-questions
+// entry, but the map shape is kept as-is - see the targeted-questions
 // migration's comment for why.
 
 import { NextResponse } from "next/server";
@@ -31,13 +31,13 @@ import { enforceRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { stripUnsafeChars } from "@/lib/rooms";
 
 // SPEC.md §10: "rate-limit ... answer submissions server-side ... to
-// prevent spam-turn abuse." Same reasoning as question/route.ts — keyed by
+// prevent spam-turn abuse." Same reasoning as question/route.ts - keyed by
 // player, backstop behind the responder-order check below, not a
 // replacement for it.
 const LIMIT = 20;
 const WINDOW_SECONDS = 60;
 
-// A responder isn't limited to "yes"/"no" — they can also type a free-text
+// A responder isn't limited to "yes"/"no" - they can also type a free-text
 // answer ("Other...") for cases a strict yes/no can't cover ("kind of",
 // "depends", a clarifying detail, etc). `questions_log.answers` is an
 // unconstrained jsonb map (see supabase/migrations/
@@ -53,7 +53,7 @@ function isAnswerValue(value: unknown): value is AnswerValue {
 
 /**
  * "yes"/"no" pass straight through untouched. Anything else is a free-text
- * "Other" answer — sanitize it the same way question text is sanitized
+ * "Other" answer - sanitize it the same way question text is sanitized
  * (strip unsafe chars, collapse whitespace, cap length) before it ever
  * reaches the DB.
  */
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     if (questionRow.target_player_id !== callerPlayerId) {
       // Belt-and-suspenders: turnState already said it's this player's
       // turn to answer, but this question's own target should always
-      // agree — if it doesn't, something's drifted and this is the
+      // agree - if it doesn't, something's drifted and this is the
       // caller's fault either way (stale client state), not a 500.
       return NextResponse.json(
         { error: "This question isn't addressed to you." },
@@ -142,8 +142,8 @@ export async function POST(request: Request) {
     const { error: updateError } = await supabase
       .from("questions_log")
       .update({
-        // A targeted question only ever gets one answer — from
-        // target_player_id, just confirmed above — so this always
+        // A targeted question only ever gets one answer - from
+        // target_player_id, just confirmed above - so this always
         // resolves it outright rather than waiting on other responders
         // the way the old broadcast model did.
         answers: { ...existingAnswers, [callerPlayerId]: cleanAnswer },

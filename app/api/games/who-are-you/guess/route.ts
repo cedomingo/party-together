@@ -3,7 +3,7 @@
 // comparison pattern: this route never returns character_id to the client.
 //
 // Correctness is resolved with the service-role client reading the
-// target's who_are_you_selections row (owner-only under RLS — the caller's
+// target's who_are_you_selections row (owner-only under RLS - the caller's
 // own client could never see it), comparing server-side, then writing
 // is_solved / guessed_character_id / solved_turn_number on the viewer's
 // who_are_you_boards row (those columns have no authenticated UPDATE grant).
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           error:
             state.turnPhase === "answering"
               ? "You can't guess while an answer is still being collected."
-              : "You've finished this turn's opponents — press \"I'm Done\" instead.",
+              : "You've finished this turn's opponents - press \"I'm Done\" instead.",
         },
         { status: 409 }
       );
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createSupabaseAdminClient();
 
-    // Trusted comparison — never select character_id through the caller's
+    // Trusted comparison - never select character_id through the caller's
     // client, and never return it in this response.
     const { data: selectionRow, error: selectionError } = await supabaseAdmin
       .from("who_are_you_selections")
@@ -128,8 +128,8 @@ export async function POST(request: Request) {
       asking_player_id: callerPlayerId,
       target_player_id: targetPlayerId,
       question_text: correct
-        ? "Guessed their character — correct!"
-        : "Guessed their character — not quite.",
+        ? "Guessed their character - correct!"
+        : "Guessed their character - not quite.",
       is_guess: true,
       guessed_character_id: characterId,
       answers: { [callerPlayerId]: correct ? "correct" : "incorrect" },

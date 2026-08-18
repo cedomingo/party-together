@@ -1,10 +1,10 @@
 // Room join endpoint (SPEC.md §7 flow, §10 "server-side rate limiting on
-// ... join ... endpoints"). Same rationale as app/api/rooms/create — moves
+// ... join ... endpoints"). Same rationale as app/api/rooms/create - moves
 // `joinRoomByCode` (lib/rooms) behind a route handler so a rate limit can
 // sit in front of it. This only covers *new* joins (someone submitting a
 // code + nickname); reconnecting an existing player row on page load
 // (app/games/[game]/room/[code]/RoomClient.tsx's initial-load effect)
-// doesn't call this at all, so a normal refresh never counts against it —
+// doesn't call this at all, so a normal refresh never counts against it -
 // see supabase/PHASE9_NOTES.md.
 
 import { NextResponse } from "next/server";
@@ -20,7 +20,7 @@ import {
   RoomNotFoundError,
 } from "@/lib/rooms";
 
-// Looser than room-create — legitimate rooms can see a burst of guests
+// Looser than room-create - legitimate rooms can see a burst of guests
 // joining in quick succession (a host sharing a link right before the
 // game starts), and this is still per-IP, not per-room.
 const LIMIT = 20;

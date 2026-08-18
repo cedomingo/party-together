@@ -1,4 +1,4 @@
-// Temporary diagnostic — confirms the actual browser session's identity
+// Temporary diagnostic - confirms the actual browser session's identity
 // chain (auth.uid() -> players.auth_id -> players.id ->
 // current_player_id_in_room()) via the caller's own cookie-authenticated
 // client, the same client every real game route uses. Calls the
@@ -6,7 +6,7 @@
 // supabase/migrations/20260808010000_debug_room_identity_check_temp.sql.
 //
 // IMPORTANT: this file must NOT live under a path segment starting with
-// `_` (e.g. `_debug/`) — Next.js treats any `_`-prefixed folder as a
+// `_` (e.g. `_debug/`) - Next.js treats any `_`-prefixed folder as a
 // private folder and excludes it from routing entirely, which is exactly
 // why app/api/games/who-am-i/_debug/guess-attempt/route.ts (an earlier,
 // now-orphaned debug route in this same repo) 404s if you ever try to hit
@@ -19,7 +19,7 @@
 // directly, or run in devtools console:
 //   fetch('/api/debug/room-identity?room_id=<uuid>').then(r => r.json()).then(console.log)
 //
-// Delete this route and its migration once the root cause is confirmed —
+// Delete this route and its migration once the root cause is confirmed -
 // see supabase/WHO_AM_I_GUESS_ASSIGNMENT_BUG_NOTES.md.
 
 import { NextResponse } from "next/server";
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     );
   }
 
-  // The RPC returns a table (array of rows) — this call always has at most
+  // The RPC returns a table (array of rows) - this call always has at most
   // one row (the LEFT JOIN either matches the caller's own player row or
   // returns nulls for it).
   const row = Array.isArray(data) ? data[0] : data;

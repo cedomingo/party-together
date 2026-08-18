@@ -1,9 +1,9 @@
 -- ---------------------------------------------------------------------------
--- TEMPORARY debug instrumentation, round 2 — remove alongside
+-- TEMPORARY debug instrumentation, round 2 - remove alongside
 -- debug_whoami() once the who_am_i guess-mismatch bug is root-caused.
 -- ---------------------------------------------------------------------------
 -- Every previous check (auth.uid(), current_player_id_in_room(), the row's
--- existence) came back exactly as expected — but each of those ran as its
+-- existence) came back exactly as expected - but each of those ran as its
 -- OWN separate HTTP request, meaning its own separate connection through
 -- Supabase's pooler. If there's anything connection/session-specific going
 -- on (a stale cached plan for the STABLE current_player_id_in_room(), a
@@ -13,7 +13,7 @@
 --
 -- This function does the identity resolution, an existence check, and the
 -- real update all inside ONE statement/transaction/connection, running
--- with the CALLER's own privileges (security invoker — NOT definer), so
+-- with the CALLER's own privileges (security invoker - NOT definer), so
 -- RLS applies exactly the way it does for the real guess route. If this
 -- still reports rows_updated = 0 while row_exists_before = true and
 -- resolved_player_id is correct, that's airtight proof the UPDATE/RLS
@@ -63,7 +63,7 @@ $$;
 grant execute on function public.debug_guess_attempt(uuid, uuid) to authenticated;
 
 comment on function public.debug_guess_attempt(uuid, uuid) is
-  'TEMPORARY — remove after the who_am_i guess RLS-mismatch bug is found. '
+  'TEMPORARY - remove after the who_am_i guess RLS-mismatch bug is found. '
   'Same identity resolution + update the real guess route performs, but '
   'all in one atomic statement/connection, to rule out cross-request '
   'pooling effects as an explanation.';

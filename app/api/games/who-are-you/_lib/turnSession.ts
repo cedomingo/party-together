@@ -1,6 +1,6 @@
 import "server-only";
 
-// Shared setup for every "Who Are You?" turn-loop API route — mirrors
+// Shared setup for every "Who Are You?" turn-loop API route - mirrors
 // app/api/games/who-am-i/_lib/turnSession.ts. Deliberately uses the
 // caller's own cookie-authenticated client for reads/writes RLS already
 // permits; the guess route additionally uses the admin client to compare

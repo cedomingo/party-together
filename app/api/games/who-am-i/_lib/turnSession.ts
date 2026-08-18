@@ -1,6 +1,6 @@
 import "server-only";
 
-// Shared setup for every Turn Loop API route (question/answer/done —
+// Shared setup for every Turn Loop API route (question/answer/done -
 // SPEC.md §8 "Turn Loop"). Each of those routes needs the exact same
 // preamble: confirm the caller is signed in, resolve their player row in
 // the session's room, and load+parse the session's turn state. Centralizing
@@ -8,13 +8,13 @@ import "server-only";
 // "session not found" actually checks.
 //
 // Deliberately uses the caller's own cookie-authenticated client
-// (`createSupabaseServerClient`), not the admin client — every read here
+// (`createSupabaseServerClient`), not the admin client - every read here
 // is something RLS already lets a room member do
 // (game_sessions_select_room_members, players_select_room_members), and
 // every write these routes go on to make (questions_log insert/update,
 // game_sessions update) is likewise something RLS already permits for a
 // room member (see supabase/migrations/20260806120400_rls_core.sql). RLS
-// just doesn't yet know about turn order — that's what these routes check
+// just doesn't yet know about turn order - that's what these routes check
 // on top, in application code (see the RLS migration's own "Open RLS edge
 // cases" comments for why that's deferred rather than pushed into a
 // policy).
@@ -22,7 +22,7 @@ import "server-only";
 // Phase 6b addition: `loadSessionForTurn` now also resolves whether the
 // caller is the room's host (needed by the manual "end game" route) and
 // rejects any turn-loop action outright once the session has already
-// ended (`ended_at` set) — SPEC.md §8 point 7's game-end condition should
+// ended (`ended_at` set) - SPEC.md §8 point 7's game-end condition should
 // be a hard stop for question/answer/done/guess, not just something the
 // UI happens to hide.
 
@@ -69,7 +69,7 @@ export async function loadSessionForTurn(sessionId: string): Promise<LoadedTurnS
     .maybeSingle();
 
   if (sessionError || !session) {
-    // RLS-scoped select — this also covers "you're not in this room" by
+    // RLS-scoped select - this also covers "you're not in this room" by
     // simply returning no row, same as a genuinely missing session.
     throw new TurnRequestError("Session not found.", 404);
   }
@@ -108,7 +108,7 @@ export async function loadSessionForTurn(sessionId: string): Promise<LoadedTurnS
 /**
  * Persists an updated turn state back onto the session. Callers pass the
  * exact next state produced by a games/who-am-i/logic/turnState.ts
- * transition — this function doesn't compute anything, just writes.
+ * transition - this function doesn't compute anything, just writes.
  */
 export async function saveTurnState(
   supabase: SupabaseClient,
@@ -128,7 +128,7 @@ export async function saveTurnState(
  *
  *   - `guess/route.ts`, when a correct guess makes every player solved.
  *     That's a system-detected condition, not a host action, and the
- *     solving player is frequently *not* the host — `rooms_update_host_only`
+ *     solving player is frequently *not* the host - `rooms_update_host_only`
  *     (RLS) would reject that player's own client trying to flip `rooms`,
  *     so this path always uses the service-role admin client. The
  *     legitimacy of the call was already established by the guess route
@@ -136,7 +136,7 @@ export async function saveTurnState(
  *   - `end/route.ts`, when the host manually ends the game. There, the
  *     caller genuinely is the host, so their own cookie-authenticated
  *     client already satisfies `rooms_update_host_only` and
- *     `game_sessions_update_room_members` — no admin client needed, and
+ *     `game_sessions_update_room_members` - no admin client needed, and
  *     using one would just be an unnecessary RLS bypass for a write RLS
  *     already allows.
  *

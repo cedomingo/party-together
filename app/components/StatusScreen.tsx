@@ -3,10 +3,10 @@
 // shell for every non-happy-path a room page can land on, so they look and
 // behave consistently instead of each being a one-off block of JSX:
 //   - `kind="loading"` -> role="status" + aria-busy, for the initial fetch
-//   - `kind="info"`    -> role="status", aria-live="polite" — a state that
+//   - `kind="info"`    -> role="status", aria-live="polite" - a state that
 //     isn't an error (room's full, already started, etc.), just something
 //     the visitor should be told about calmly
-//   - `kind="error"`   -> role="alert" — something actually went wrong
+//   - `kind="error"`   -> role="alert" - something actually went wrong
 //
 // Game-agnostic on purpose: this lives in /app/components alongside
 // CreateRoomForm/JoinRoomForm, not inside a game module, and takes no
@@ -23,7 +23,7 @@ interface StatusScreenProps {
   /** Show a "Back to home" link. Defaults to true for info/error, false for loading. */
   showHomeLink?: boolean;
   /** Render only the state-screen block, without the <main> wrapper or home
-   * link — for embedding inside a page that already renders its own <main>
+   * link - for embedding inside a page that already renders its own <main>
    * (e.g. the games listing's in-place loading state while a room is being
    * created/switched). No nested <main>, no duplicate "main-content" id. */
   embedded?: boolean;

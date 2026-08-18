@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "It isn't your turn to ask a question." }, { status: 403 });
     }
     if (state.finishedAskerIds.includes(callerPlayerId)) {
-      return NextResponse.json({ error: "You've already finished — no more questions." }, { status: 409 });
+      return NextResponse.json({ error: "You've already finished - no more questions." }, { status: 409 });
     }
 
     const targetPlayerId = currentAskTargetId(state);

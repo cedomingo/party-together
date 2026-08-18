@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- TEMPORARY debug instrumentation — remove once the who_am_i guess-mismatch
+-- TEMPORARY debug instrumentation - remove once the who_am_i guess-mismatch
 -- bug is root-caused. Not referenced by any app feature.
 -- ---------------------------------------------------------------------------
 -- Every static check we can run from the SQL editor (which runs as
@@ -7,7 +7,7 @@
 -- to the right player, for the right session. Yet the live UPDATE in
 -- guess/route.ts still matches 0 rows under RLS. The only thing left
 -- unverified is what `auth.uid()` actually resolves to *at the moment
--- Postgres evaluates the RLS policy* for that specific request — which may
+-- Postgres evaluates the RLS policy* for that specific request - which may
 -- not be the same identity `supabase.auth.getUser()` resolved earlier in
 -- the same route handler, if a token refresh happens in between.
 --
@@ -35,7 +35,7 @@ $$;
 grant execute on function public.debug_whoami() to anon, authenticated;
 
 comment on function public.debug_whoami() is
-  'TEMPORARY — remove after the who_am_i guess RLS-mismatch bug is found. '
+  'TEMPORARY - remove after the who_am_i guess RLS-mismatch bug is found. '
   'Echoes auth.uid()/jwt role/sub as Postgres sees them for the calling '
   'request, for comparison against supabase.auth.getUser() resolved '
   'earlier in the same request.';

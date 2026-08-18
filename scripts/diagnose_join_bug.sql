@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- Run this in the Supabase Dashboard → SQL Editor (not psql via the pooler,
 -- the dashboard editor is fine) on the live project. It doesn't change
--- anything — read-only — and its output is what actually decides between
+-- anything - read-only - and its output is what actually decides between
 -- "the join bug is a live-vs-repo drift" vs. "the bug is something else."
 -- ---------------------------------------------------------------------------
 
@@ -38,14 +38,14 @@ order by table_name, grantee, privilege_type;
 
 -- 3) Every migration Supabase thinks has actually been applied, newest
 --    first. Compare the filenames here against the files in
---    supabase/migrations/ — anything present in the folder but missing
+--    supabase/migrations/ - anything present in the folder but missing
 --    from this list hasn't been pushed (supabase db push) or run.
 select version
 from supabase_migrations.schema_migrations
 order by version desc
 limit 20;
 
--- 4) Rows for the specific room you're testing with — swap in the real
+-- 4) Rows for the specific room you're testing with - swap in the real
 --    code. Confirms, from the DB's point of view (not the client's stale
 --    read), that status really is 'lobby' and max_players is what you
 --    expect at the moment the join fails.

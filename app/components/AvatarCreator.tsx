@@ -6,12 +6,12 @@
 // instead of typing a nickname separately into each form. The chosen
 // name/color/accessory is persisted to localStorage by the caller (see
 // loadStoredAvatar/saveStoredAvatar in lib/avatar.ts) so it carries over
-// the next time this visitor creates or joins a room — the look itself is
+// the next time this visitor creates or joins a room - the look itself is
 // still client-side only, `name` is just handed down to
 // CreateRoomForm/JoinRoomForm as the nickname.
 //
 // The color/accessory rows show only the category word ("Color" /
-// "Accessory"), not the specific option's name — the swatch/name already
+// "Accessory"), not the specific option's name - the swatch/name already
 // isn't needed to tell what changed, since the preview above updates live.
 // The actual value is still exposed to screen readers via the buttons'
 // aria-labels and a visually-hidden suffix on each row.
@@ -30,7 +30,7 @@ export interface AvatarCreatorProps {
    * False until every mushroom/accessory PNG has been preloaded (see
    * `preloadAvatarAssets` in lib/avatar.ts). While false, the live preview
    * and the ‹ › cycle buttons are replaced with a loading placeholder
-   * instead of rendering an avatar that might still be mid-download —
+   * instead of rendering an avatar that might still be mid-download -
    * that flash-then-pop-in (and the same lag on every subsequent
    * click) is exactly what this is preventing. Defaults to true so
    * existing callers that don't care about this keep working unchanged.

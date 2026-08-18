@@ -1,10 +1,10 @@
 /* ===========================================================================
-   Party Together — visual theme
+   Party Together - visual theme
    ---------------------------------------------------------------------------
    Cozy, hand-drawn indie-game look: warm parchment background, muted earthy
    accent colors, thick ink outlines, chunky tactile buttons. Every selector
    below is unchanged from the previous stylesheet (same class names, same
-   components, same behavior) — only the visual declarations were restyled.
+   components, same behavior) - only the visual declarations were restyled.
    =========================================================================== */
 
 @import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap");
@@ -17,7 +17,7 @@
   --font-body: "Quicksand", ui-rounded, system-ui, sans-serif;
 
   /* ---- Palette (warm cream base + muted earthy accents) ----------------- */
-  --cream: #fdf5ec; /* page background — aged/parchment paper */
+  --cream: #fdf5ec; /* page background - aged/parchment paper */
   --paper: #fefaf4; /* card & panel surface, a shade lighter than the page */
   --ink: #2f2a22; /* body text + hand-inked outlines */
   --ink-70: rgba(47, 42, 34, 0.72);
@@ -37,10 +37,10 @@
 
   /* --danger is used both as a background (host "End Game" button, the
      recap "lost" badge) and as plain text on --cream (.field-error, the
-     incorrect-guess result) — the same dual role the old #c0392b played.
+     incorrect-guess result) - the same dual role the old #c0392b played.
      The art-direction swatch (#c96f69, kept below as --coral for purely
-     decorative borders/tints) only measures ~3:1 against --cream — short
-     of WCAG AA's 4.5:1 for text — so --danger itself is a deeper dusty-brick
+     decorative borders/tints) only measures ~3:1 against --cream - short
+     of WCAG AA's 4.5:1 for text - so --danger itself is a deeper dusty-brick
      shade of the same coral family: ~4.55:1 against --cream, and ~4.55:1
      again for --cream text sitting on a --danger background. Passes AA
      both ways this file actually uses it. */
@@ -54,12 +54,12 @@
 
   --border: var(--ink);
 
-  /* Pure white card surface — used where a card needs to read as "clean
+  /* Pure white card surface - used where a card needs to read as "clean
      white", distinct from the warmer --paper tone the rest of the app
      uses (Who Am I's deck cards specifically, per design spec). */
   --card-surface: #ffffff;
 
-  /* Gently irregular corners everywhere instead of perfect circles —
+  /* Gently irregular corners everywhere instead of perfect circles -
      "hand-inked", not mathematically precise (per the art direction). */
   --radius-lg: 22px 26px 20px 24px;
   --radius-md: 16px 19px 14px 18px;
@@ -88,7 +88,7 @@ body {
   line-height: 1.6;
   color: var(--ink);
   background-color: var(--cream);
-  /* Extremely subtle paper grain — a faint ink-tinted noise tile, not a
+  /* Extremely subtle paper grain - a faint ink-tinted noise tile, not a
      heavy filter (art direction: "should only make the interface feel
      less digitally sterile"). */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.18 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -132,10 +132,10 @@ a:hover {
    components remembering to add their own. `:focus-visible` (not
    `:focus`) so this only shows for keyboard/assistive-tech navigation,
    not on every mouse click. `.who-am-i-card` already had its own
-   equivalent rule (Phase 5) — left as-is below since it also has to sit
+   equivalent rule (Phase 5) - left as-is below since it also has to sit
    on top of that button's `overflow`/background, but it's the same
    outline color/offset as everything else here.
-   Ink (not the mustard accent) is used for the outline itself — mustard
+   Ink (not the mustard accent) is used for the outline itself - mustard
    only measures ~1.9:1 against the cream page background, easy to miss;
    ink clears 12:1 against everything on this page.
    ------------------------------------------------------------------- */
@@ -174,7 +174,7 @@ textarea:focus-visible,
   outline-offset: -3px;
 }
 
-/* Respect reduced-motion preferences (SPEC.md §11 accessibility) — every
+/* Respect reduced-motion preferences (SPEC.md §11 accessibility) - every
    animation in this file (typing pulse, loading spinner) gets frozen to
    a static frame instead of removed outright, so the *information* the
    animation conveys (something is loading / someone is typing) is still
@@ -192,7 +192,7 @@ textarea:focus-visible,
 
 /* ---------------------------------------------------------------------
    Mobile-first touch targets (SPEC.md §11). Most players open a shared
-   room link on a phone — WCAG 2.5.5/Apple & Material guidance both land
+   room link on a phone - WCAG 2.5.5/Apple & Material guidance both land
    on ~44px as the practical minimum comfortable tap target. Applied
    globally to every button/rendered-as-button rather than per-component
    so a future game module gets this for free.
@@ -204,7 +204,7 @@ button,
 
 /* Buttons keep `width: fit-content` (below) on pointer-driven devices,
    but that packs two side-by-side buttons (e.g. Yes/No) uncomfortably
-   close together on a narrow phone screen — grow them to share the row
+   close together on a narrow phone screen - grow them to share the row
    evenly instead once a container opts in. */
 .who-am-i-answer-buttons button {
   flex: 1;
@@ -226,7 +226,7 @@ a {
   padding: 2rem 1.25rem 4rem;
 }
 
-/* A couple of small hand-drawn doodles anchored to the page corners —
+/* A couple of small hand-drawn doodles anchored to the page corners -
    decorative accents only, never covering content (art direction:
    "used as accents, not as clutter"). */
 .page::before,
@@ -283,12 +283,12 @@ a {
 }
 
 /* -----------------------------------------------------------------------
-   Hand-drawn paper borders (public/ui/elements/borders/) — each PNG is
+   Hand-drawn paper borders (public/ui/elements/borders/) - each PNG is
    authored at a fixed size; apply the variant whose aspect ratio best
    matches the container so strokes stay crisp instead of stretched.
    No border-radius on framed panels: clipping would shave the scribble
    corners. The background-image on each panel below is only the no-JS/
-   pre-hydration fallback — PaperBorderAuto.tsx (mounted in app/layout.tsx)
+   pre-hydration fallback - PaperBorderAuto.tsx (mounted in app/layout.tsx)
    observes every framed container at runtime and swaps in the closest-
    matching asset for its actual size, so responsive re-layouts (stacked
    topbar on mobile, sidebar turning into a rail, etc.) never stretch the
@@ -406,7 +406,7 @@ button:disabled {
 }
 
 /* -----------------------------------------------------------------------
-   Game picker — searchable cover-card grid for choosing a game
+   Game picker - searchable cover-card grid for choosing a game
    (app/components/GamePicker.tsx). Reused by the create-room form and the
    /games listing page. Cards are <button>s (whole card is the click
    target), with a search field above that filters by name/description
@@ -436,7 +436,7 @@ button:disabled {
 
 /* Card overrides for the global `button` styles (display-font text,
    fit-content width, generous padding): a card is full-width, body-font,
-   and flush — the cover bleeds to its edges. */
+   and flush - the cover bleeds to its edges. */
 .game-picker-card {
   display: flex;
   flex-direction: column;
@@ -453,20 +453,20 @@ button:disabled {
   border: none;
   /* No border-radius: the frame's irregular scribble corners are the
      point, and rounding the card would shave them off. The global
-     `button` rule rounds everything by default — this card opts out. */
+     `button` rule rounds everything by default - this card opts out. */
   border-radius: 0;
   box-shadow: var(--shadow-flat-sm);
 }
 
 /* The global :focus-visible rule re-rounds focused buttons (border-radius:
-   4px to shape its outline) — keep the frame's scribble corners intact
+   4px to shape its outline) - keep the frame's scribble corners intact
    when keyboard-navigating the grid too. */
 .game-picker-card:focus-visible {
   border-radius: 0;
 }
 
 /* The global `button:hover` rule styles via the `background` shorthand,
-   which resets background-image/size/repeat to their initial values — on
+   which resets background-image/size/repeat to their initial values - on
    this card that would shrink the frame PNG to its natural size, tile it
    across the card, and flood the surface with the accent color, making the
    paper border vanish on hover (and, on touch devices, for as long as the
@@ -512,8 +512,8 @@ button:disabled {
   /* Fixed floor for the name plus up to two description lines, so every
      card in the grid is the same height no matter how much text a
      description has (shorter text just leaves a little paper below).
-     Also keeps the aspect ratio — and therefore the paper-border asset
-     PaperBorderAuto picks — identical across cards, so side-by-side
+     Also keeps the aspect ratio - and therefore the paper-border asset
+     PaperBorderAuto picks - identical across cards, so side-by-side
      frames match. */
   min-height: 4.85rem;
 }
@@ -536,7 +536,7 @@ button:disabled {
 }
 
 /* -----------------------------------------------------------------------
-   Avatar creator — sits above the Create/Join two-up on the home page and
+   Avatar creator - sits above the Create/Join two-up on the home page and
    every per-game landing page (app/components/RoomForms.tsx). Same paper
    card language as .panel-form so it reads as part of the family rather
    than a bolted-on widget. Border size picked at runtime.
@@ -569,7 +569,7 @@ button:disabled {
 }
 
 /* Stand-in for the avatar preview while its assets are still being
-   preloaded (see preloadAvatarAssets in lib/avatar.ts) — same circular
+   preloaded (see preloadAvatarAssets in lib/avatar.ts) - same circular
    "stage" shape as .avatar-icon so nothing jumps in size once the real
    preview swaps in. A slow shimmer instead of a spinner keeps it feeling
    like part of the cozy paper-cutout style rather than a generic loader. */
@@ -625,7 +625,7 @@ button:disabled {
 /* "Wiggly paint" jitter: small, irregular rotate/scale/translate steps
    (not a smooth sine bounce) so it reads as a hand-nudged paper cutout,
    never perfectly static. The mushroom and accessory layers use offset
-   keyframe sets and durations so they don't wiggle in lockstep — like two
+   keyframe sets and durations so they don't wiggle in lockstep - like two
    separate pieces of paper, not one rigid sticker. */
 @keyframes wiggle-a {
   0% {
@@ -695,7 +695,7 @@ button:disabled {
   }
 }
 
-/* Color / Accessory pickers — "‹ Color ›" / "‹ Accessory ›": just the
+/* Color / Accessory pickers - "‹ Color ›" / "‹ Accessory ›": just the
    category name centered between two arrows (the preview above already
    shows what changed, so the row doesn't need to repeat the specific
    option's name). Compact enough to stack two under the preview without
@@ -732,7 +732,7 @@ button:disabled {
   text-align: center;
 }
 
-/* Visually hidden but still announced by screen readers — used to keep
+/* Visually hidden but still announced by screen readers - used to keep
    the actual selected color/accessory name accessible even though the
    picker row itself only shows the category word. */
 .sr-only {
@@ -748,7 +748,7 @@ button:disabled {
 }
 
 /* Host lobby options, e.g. "Who Am I?"'s "First One Out Wins?" toggle
-   (see GameConfig.LobbyOptions in lib/games-registry.ts) — a single-row
+   (see GameConfig.LobbyOptions in lib/games-registry.ts) - a single-row
    checkbox rather than the stacked label/input `.field` layout above. */
 .field-checkbox {
   display: flex;
@@ -791,7 +791,7 @@ button:disabled {
 
 /* /games page header row (app/components/GamesListing.tsx): the "Browse
    Party Games" title with the copy-invite-link button pinned to the far
-   right — never inline after the room-info text below it. `margin-left:
+   right - never inline after the room-info text below it. `margin-left:
    auto` keeps the button right-aligned even when the row wraps. */
 .games-heading {
   display: flex;
@@ -849,7 +849,7 @@ button:disabled {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  /* Solid (not pastel) lavender — the swatch's #80709D only clears ~3.8:1
+  /* Solid (not pastel) lavender - the swatch's #80709D only clears ~3.8:1
      against white/cream, short of AA for text this small; this deepened
      shade clears 4.5:1 for the cream label sitting on top of it. */
   background: #74668b;
@@ -860,7 +860,7 @@ button:disabled {
 }
 
 /* ---------------------------------------------------------------------
-   Shared state screen (app/components/StatusScreen.tsx) — loading,
+   Shared state screen (app/components/StatusScreen.tsx) - loading,
    room-not-found, room-full, room-already-started, and generic error
    (SPEC.md §11 "clean loading/empty/error states"). One look for all of
    them instead of each being a bespoke block of centered text.
@@ -921,7 +921,7 @@ button:disabled {
 }
 
 /* Generic shell for a registered game's placeholder room view (Phase 3).
-   Intentionally minimal/game-agnostic styling — real per-game visuals
+   Intentionally minimal/game-agnostic styling - real per-game visuals
    belong inside that game module, not here. */
 .game-placeholder {
   display: flex;
@@ -943,7 +943,7 @@ button:disabled {
 }
 
 /* ===========================================================================
-   "Who Am I?" — messaging-app restructure: a full-bleed 3-column layout
+   "Who Am I?" - messaging-app restructure: a full-bleed 3-column layout
    (conversation sidebar / chat panel / character deck) instead of stacked
    sections. Breaks out of `.page`'s 720px cap via the classic negative-
    margin full-bleed trick, so the columns get real room on a laptop/tablet
@@ -961,7 +961,7 @@ button:disabled {
 }
 
 /* ---- Top bar: avatar + round/status (left), player-avatar row (center),
-   How to Play / Leave Game (right) — replaces the old text-heavy appbar. */
+   How to Play / Leave Game (right) - replaces the old text-heavy appbar. */
 .who-am-i-topbar {
   display: flex;
   flex-wrap: wrap;
@@ -1075,7 +1075,7 @@ button:disabled {
 }
 
 /* The status badge ("Pick your character", "Ask or guess for X", …) is the
-   header's centerpiece — pin it to the exact center. On desktop the
+   header's centerpiece - pin it to the exact center. On desktop the
    left/right groups are unequal widths (avatar + name + "You are" chip vs
    the buttons), so plain flex centering leaves the badge visibly off-center;
    absolute positioning at 50% guarantees true centering, and there's always
@@ -1136,7 +1136,7 @@ button:disabled {
   background: color-mix(in srgb, var(--danger) 85%, black);
 }
 
-/* ---- Secondary status strip: presence/typing/solved/guess result —
+/* ---- Secondary status strip: presence/typing/solved/guess result -
    everything the compact top bar doesn't have room for, shown only when
    relevant. The host's end-game control used to live here too; it's now
    merged into the top bar's Leave/End Game button (see
@@ -1194,7 +1194,7 @@ button:disabled {
   margin-top: 0.5rem;
 }
 
-/* ---- Confirm dialog — our own replacement for window.confirm(), reusing
+/* ---- Confirm dialog - our own replacement for window.confirm(), reusing
    the How to Play modal's backdrop/card but with a Cancel/Confirm row. ---- */
 .who-am-i-confirm-actions {
   display: flex;
@@ -1217,7 +1217,7 @@ button:disabled {
   align-items: start;
 }
 
-/* Board-only variant of the same layout — used by "Who Are You?"'s
+/* Board-only variant of the same layout - used by "Who Are You?"'s
    pick-a-character screen so it reads as the playing board (same shell,
    topbar, and deck) minus the sidebar/chat columns. The deck is centered
    at the same width the in-game deck column occupies on desktop (1180px
@@ -1323,7 +1323,7 @@ button:disabled {
 
 /* ---- Chat panel: full history with the selected player. Fixed `height`
    (not a min/max range) so this never grows as a conversation gets longer
-   — new messages just scroll inside `.who-am-i-chat-messages` below,
+   - new messages just scroll inside `.who-am-i-chat-messages` below,
    which is the actual scroll container. ------------------------------------ */
 .who-am-i-chat-panel {
   display: flex;
@@ -1341,7 +1341,7 @@ button:disabled {
 /* ---- Player log: who asked/answered/ended their turn, below the chat
    panel (moved out of the top status strip). Same card treatment as the
    sidebar/chat panel so it reads as part of the same column.
-   Collapsed by default — `max-height` only leaves room for the heading
+   Collapsed by default - `max-height` only leaves room for the heading
    plus the single most-recent line (the list itself is rendered most-
    recent-first in RoomView.tsx, so that's always the first `<li>`), with
    everything after it clipped by `overflow: hidden`. Hovering, or the
@@ -1447,10 +1447,10 @@ button:disabled {
 
 /* Hover/tap-to-peek on your own avatar (Who Are You? turns phase): hovering
    (desktop) or tap-and-hold (mobile) cross-fades the character you picked
-   over your mushroom avatar — and fades back when you stop. Driven purely
+   over your mushroom avatar - and fades back when you stop. Driven purely
    by :hover/:active so it needs no JS state; the invisible no-op touch
    handler on the element makes iOS Safari apply :active while touching.
-   Deliberately NOT clickable: no pointer cursor, no onClick — it's a
+   Deliberately NOT clickable: no pointer cursor, no onClick - it's a
    reveal, not a button. The character image sits in the same black-edged
    "dish" as the mushroom art (same border + inset shadow as .avatar-icon),
    clipped inside its own round stage. */
@@ -1504,7 +1504,7 @@ button:disabled {
   flex: 1;
   /* Without this, a flex item's default auto min-height can let its
      content (a long back-and-forth) push past the panel's fixed height
-     instead of scrolling inside it — this is what keeps the panel itself
+     instead of scrolling inside it - this is what keeps the panel itself
      pinned at a constant size no matter how long the conversation gets. */
   min-height: 0;
   overflow-y: auto;
@@ -1609,7 +1609,7 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-/* ---- Main content: My Deck — the primary visual focus ------------------ */
+/* ---- Main content: My Deck - the primary visual focus ------------------ */
 .who-am-i-deck {
   grid-area: deck;
   min-width: 0;
@@ -1621,11 +1621,11 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  /* Was -6rem (a brittle negative-margin hack) — that value only "worked"
+  /* Was -6rem (a brittle negative-margin hack) - that value only "worked"
      at one specific viewport width and risked overlapping the header row
      on narrower/wrapped layouts. The real gap between "My Deck" and the
-     board lives in .who-am-i-deck-board's top padding instead — see
-     below — so this just needs a small, normal, bounded value. */
+     board lives in .who-am-i-deck-board's top padding instead - see
+     below - so this just needs a small, normal, bounded value. */
   margin-bottom: 0.25rem;
 }
 
@@ -1670,13 +1670,13 @@ button:disabled {
 }
 
 /* The blueboard art asset as the deck's background, like the reference
-   physical Guess Who board — the grid of cards sits on top of it.
+   physical Guess Who board - the grid of cards sits on top of it.
    background-size: contain (not cover) so the full board art is always
    visible with nothing cropped off the sides; aspect-ratio locks the box
    to a square to match the board's actual 5x5 proportions. No border or
-   shadow around the box itself (design spec) — the art and card shadows
+   shadow around the box itself (design spec) - the art and card shadows
    carry the edge instead. Padding is the buffer between the board's own
-   edges and the card grid — top is small since .who-am-i-deck-header
+   edges and the card grid - top is small since .who-am-i-deck-header
    above already provides spacing; sides are wider so the grid's outer
    columns clear the board's curved edges instead of overhanging them. */
 .who-am-i-deck-board {
@@ -1701,7 +1701,7 @@ button:disabled {
   padding: 0;
   display: grid;
   /* Locked to exactly 5 equal-width columns to match the board's 5x5
-     layout — never auto-fill/auto-fit, which would change the column
+     layout - never auto-fill/auto-fit, which would change the column
      count based on available space. */
   grid-template-columns: repeat(5, 1fr);
   /* Lets each card use its own fixed width (set below) instead of
@@ -1716,7 +1716,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   gap: 0rem;
-  /* Fixed card size — independent of the grid's column width, thanks to
+  /* Fixed card size - independent of the grid's column width, thanks to
      justify-items: center above. Adjust this number to resize cards
      without touching the board or the 5-column rule. Shrunk to match
      the smaller board (.who-am-i-deck-board's new max-width). */
@@ -1730,7 +1730,7 @@ button:disabled {
   box-shadow: var(--shadow-flat-sm);
 }
 
-/* Override the global button:hover yellow tint for character cards —
+/* Override the global button:hover yellow tint for character cards -
    keep only the lift + shadow, no color change. Wins over the global
    button:hover:not(:disabled) rule on specificity (3 classes vs 1
    element + 2 pseudo-classes). */
@@ -1787,13 +1787,13 @@ button:disabled {
   outline-offset: 2px;
 }
 
-/* "Who Are You?" character picker (WHO-ARE-YOU-SPEC.md §3) — the
+/* "Who Are You?" character picker (WHO-ARE-YOU-SPEC.md §3) - the
    selected-but-not-yet-locked-in state on a reused `.who-am-i-card`.
    Deliberately loud: this is the one spot on the picker where the player
    must see their choice at a glance against the busy blueboard behind it
    (the old faint blue ring blended into the background). Thick ink
    border, mustard-tinted fill, a checkmark badge in the corner, and a
-   slight lift make the picked card read instantly — the mustard accent
+   slight lift make the picked card read instantly - the mustard accent
    matches the app's interactive-highlight color, not --danger's
    elimination red. */
 .who-am-i-card.selected {
@@ -1825,7 +1825,7 @@ button:disabled {
   box-shadow: 1px 2px 0 rgba(47, 42, 34, 0.28);
 }
 
-/* ---- "Who Are You?" — setup/picking phase only (Step 1) ---------------- */
+/* ---- "Who Are You?" - setup/picking phase only (Step 1) ---------------- */
 .who-are-you-shell {
   width: 100vw;
   max-width: 100vw;
@@ -1850,7 +1850,7 @@ button:disabled {
   text-align: center;
 }
 
-/* Framed picked-character card — thick ink border matches the picker's
+/* Framed picked-character card - thick ink border matches the picker's
    selected state so the locked-in choice reads as "chosen" here too. */
 .who-are-you-picked-card {
   display: flex;
@@ -1876,7 +1876,7 @@ button:disabled {
 }
 
 /* Same visual language as the lobby's `.status-dot`, but tracks "has
-   picked a character" rather than "is currently connected" — kept as its
+   picked a character" rather than "is currently connected" - kept as its
    own class rather than reusing `.status-dot`/`.online` so the two
    meanings can't be confused in markup. */
 .who-are-you-ready-dot {
@@ -1971,7 +1971,7 @@ button:disabled {
   margin: 0 0 0.4rem;
 }
 
-/* "I'm Done" — centered below the table, once the asker has reviewed the
+/* "I'm Done" - centered below the table, once the asker has reviewed the
    turn's answers (moved down from the top bar per design spec). */
 .who-am-i-done-cta {
   display: flex;
@@ -1981,7 +1981,7 @@ button:disabled {
   margin-top: 1.1rem;
 }
 
-/* "Who Am I?" — presence / typing / live feed, now living in the status
+/* "Who Am I?" - presence / typing / live feed, now living in the status
    strip below the top bar instead of a full-width "Turn" section. */
 .who-am-i-offline-hint,
 .who-am-i-typing-indicator {
@@ -2031,7 +2031,7 @@ button:disabled {
 }
 
 
-/* "Who Am I?" — Yes/No/Other answer control (SPEC.md §8 point 3 — a
+/* "Who Am I?" - Yes/No/Other answer control (SPEC.md §8 point 3 - a
    responder isn't always limited to a strict yes/no). */
 .who-am-i-other-answer-form {
   display: flex;
@@ -2051,7 +2051,7 @@ button:disabled {
   box-shadow: none;
 }
 
-/* "Who Am I?" — guess-your-identity + host "End Game" controls
+/* "Who Am I?" - guess-your-identity + host "End Game" controls
    (SPEC.md §8 points 6-7). */
 .who-am-i-guess-panel {
   display: flex;
@@ -2090,7 +2090,7 @@ button:disabled {
   color: var(--ink-70);
 }
 
-/* "Who Am I?" — Recap screen (SPEC.md §8 point 7). */
+/* "Who Am I?" - Recap screen (SPEC.md §8 point 7). */
 .who-am-i-recap {
   margin-top: 0.5rem;
 }
@@ -2173,7 +2173,7 @@ button:disabled {
   border-top: 2px dashed var(--ink-18);
 }
 
-/* Mode-aware winner/loser framing (turnState.ts `getGameOutcome`) — see
+/* Mode-aware winner/loser framing (turnState.ts `getGameOutcome`) - see
    Recap.tsx. Reuses the accent/danger palette rather than introducing new
    colors, same as the rest of the UI (`.field-error` already uses
    --danger, buttons already use --accent). */
@@ -2191,7 +2191,7 @@ button:disabled {
   flex-shrink: 0;
 }
 
-/* Gold for a win — the badge default (lavender) reads as a neutral/host
+/* Gold for a win - the badge default (lavender) reads as a neutral/host
    tag, so the winner gets its own callout instead of inheriting that. */
 .who-am-i-recap-winner-badge {
   background: var(--accent);
@@ -2204,8 +2204,8 @@ button:disabled {
 }
 
 /* ---- Recap end-screen actions. Host-only: "Play Again" (same game, back
-   to the lobby — Recap.tsx's onPlayAgain) and "Play More Games" (swap to a
-   different game via /games?room=CODE — Recap.tsx's onPlayMoreGames).
+   to the lobby - Recap.tsx's onPlayAgain) and "Play More Games" (swap to a
+   different game via /games?room=CODE - Recap.tsx's onPlayMoreGames).
    Non-hosts get the .who-am-i-recap-waiting note instead of buttons. ----- */
 .who-am-i-recap-actions {
   display: flex;
@@ -2222,7 +2222,7 @@ button:disabled {
   min-width: 160px;
 }
 
-/* Shown to non-host players in place of the "Play Again" button — only
+/* Shown to non-host players in place of the "Play Again" button - only
    the host can send the room back to the lobby. */
 .who-am-i-recap-waiting {
   flex: 1;
@@ -2233,11 +2233,11 @@ button:disabled {
 /* ---------------------------------------------------------------------
    Mobile-first responsive refinements (SPEC.md §11). Most of this file
    is already mobile-first by construction (single-column flex/grid
-   layouts that only gain columns at wider breakpoints — see `.two-up`
+   layouts that only gain columns at wider breakpoints - see `.two-up`
    above). This block tightens up the handful of spots that were tuned
    for a laptop viewport and cramp on a small phone.
    ------------------------------------------------------------------- */
-/* "Who Am I?" responsive layout — the deck stays the primary visual focus
+/* "Who Am I?" responsive layout - the deck stays the primary visual focus
    at every width (SPEC.md restructure request); the sidebar/chat columns
    fold up around it instead of the other way around. */
 @media (max-width: 980px) {
@@ -2324,7 +2324,7 @@ button:disabled {
   }
 
   /* The deck board and its grid must still match the desktop 5x5 layout
-     on mobile — just scaled down. grid-template-columns stays locked to
+     on mobile - just scaled down. grid-template-columns stays locked to
      repeat(5, 1fr) (never auto-fill, which would silently change the
      column count and blow the grid past the board's edges); card width
      and gap shrink instead so 5 columns actually fit a phone screen. */
@@ -2348,7 +2348,7 @@ button:disabled {
 
   /* A form's own submit button is the main place `width: fit-content`
      (the button default) produces awkward thumb-reach targets on a narrow
-     screen — stack it instead. `.who-am-i-answer-buttons` already grows
+     screen - stack it instead. `.who-am-i-answer-buttons` already grows
      Yes/No/Other to fill the row (see the `flex: 1` rule above) rather
      than stacking, since those specifically read better side-by-side even
      on a phone; this only affects the rest.
@@ -2362,7 +2362,7 @@ button:disabled {
   }
 
   /* Yes/No/Other is now three buttons in that same row (previously just
-     Yes/No) — `flex: 1` above still shares the row evenly, but on the
+     Yes/No) - `flex: 1` above still shares the row evenly, but on the
      narrowest phones three roughly-equal buttons plus their labels can
      get tight, so let the row wrap rather than squeeze. */
   .who-am-i-answer-buttons {

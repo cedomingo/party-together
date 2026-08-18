@@ -1,7 +1,7 @@
 "use client";
 
 // Supabase client for use in Client Components.
-// Uses the public anon key — RLS policies are what actually restrict access,
+// Uses the public anon key - RLS policies are what actually restrict access,
 // not this key, so it is safe to ship to the browser.
 //
 // Usage:

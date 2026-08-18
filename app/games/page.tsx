@@ -1,5 +1,5 @@
-// /games — the game listing (app/components/GamePicker.tsx + GamesListing.tsx).
-// Reads the games registry so it automatically picks up new games — no
+// /games - the game listing (app/components/GamePicker.tsx + GamesListing.tsx).
+// Reads the games registry so it automatically picks up new games - no
 // game-specific code should ever be added directly to this file
 // (SPEC.md §3, §7).
 //
@@ -7,12 +7,12 @@
 //   - browse (no param): each game's cover card links to that game's
 //     landing page (/games/[game]), where a room can be created for it.
 //   - room swap (?room=CODE): clicking a card switches the EXISTING room
-//     to that game (app/api/rooms/switch-game/route.ts — same room code,
+//     to that game (app/api/rooms/switch-game/route.ts - same room code,
 //     same players, room back in the lobby) and redirects into its
 //     waiting room.
 //
 // Only the bare /games listing is indexable (see app/sitemap.ts); the
-// ?room= variant and the /room/[code] room pages are deliberately not —
+// ?room= variant and the /room/[code] room pages are deliberately not -
 // room pages are noindex (app/games/[game]/room/[code]/page.tsx).
 
 import type { Metadata } from "next";
@@ -31,7 +31,7 @@ export default async function GamesPage({
 }) {
   const { room } = await searchParams;
   // Room codes are stored/presented uppercase (lib/rooms normalizeRoomCode)
-  // — normalize the query param so the header, API call, and redirect all
+  // - normalize the query param so the header, API call, and redirect all
   // agree, whether the host's link said ?room=ABCD or ?room=abcd.
   const roomCode = room?.trim().toUpperCase() || null;
 
@@ -42,7 +42,7 @@ export default async function GamesPage({
           same row as the title, pinned to the far right. */}
       <GamesListing games={games.map(toGameSummary)} roomCode={roomCode} />
 
-      {games.length === 0 && <p className="muted">No games are registered yet — nothing to play just yet.</p>}
+      {games.length === 0 && <p className="muted">No games are registered yet - nothing to play just yet.</p>}
     </main>
   );
 }

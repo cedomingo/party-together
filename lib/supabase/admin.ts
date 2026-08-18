@@ -1,7 +1,7 @@
 import "server-only";
 
 // Privileged Supabase client using the service role key.
-// Bypasses RLS entirely — only ever import this from trusted server-side
+// Bypasses RLS entirely - only ever import this from trusted server-side
 // code (cron/cleanup route handlers, the character-roster seed script).
 // NEVER import this from a Client Component or anything bundled to the browser.
 //

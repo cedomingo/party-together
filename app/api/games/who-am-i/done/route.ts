@@ -1,15 +1,15 @@
-// "I'm Done" — the asker ends their turn once every other player has
+// "I'm Done" - the asker ends their turn once every other player has
 // individually answered their own question (SPEC.md §8 "Turn Loop" point
 // 4; see games/who-am-i/logic/turnState.ts's file header for the 1:1
 // targeting model). Only the current asker may call this, and only once
 // the loop has reached "reviewing" (i.e. every responder in
-// answeringOrder has had — and answered — their own question this turn —
+// answeringOrder has had - and answered - their own question this turn -
 // see `advanceAfterAnswer` in turnState.ts, which is what flips phase to
 // "reviewing" in the first place).
 //
 // Deliberately NOT implemented here (that's a separate follow-up per the
 // user's phase split): guess/solved handling and the game-end condition.
-// This route only ever rotates turnOrder to the next player — see
+// This route only ever rotates turnOrder to the next player - see
 // `advanceTurn`.
 
 import { NextResponse } from "next/server";

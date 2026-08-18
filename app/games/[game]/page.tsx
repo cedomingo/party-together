@@ -1,5 +1,5 @@
 // Indexable, server-rendered SEO landing page for a single game
-// (e.g. /games/who-am-i). Crawlable — this is the page meant to rank in
+// (e.g. /games/who-am-i). Crawlable - this is the page meant to rank in
 // search, as opposed to the live room pages under /room/[code] which are
 // noindex (see app/games/[game]/room/[code]/page.tsx).
 //
@@ -36,7 +36,7 @@ export default async function GameLandingPage({
           <RoomForms fixedGameId={config.id} />
         </>
       ) : (
-        <p>Game landing page placeholder — Phase 0 scaffolding.</p>
+        <p>Game landing page placeholder - Phase 0 scaffolding.</p>
       )}
     </main>
   );

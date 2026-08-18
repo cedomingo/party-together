@@ -1,7 +1,7 @@
 // Best-effort presence endpoint (SPEC.md §7: "on disconnect, mark player
 // connected: false"). `navigator.sendBeacon` can't call a Server Action, so
 // the client posts here on `pagehide` instead. This runs through the normal
-// cookie-authenticated Supabase server client — RLS (`players_update_self`)
+// cookie-authenticated Supabase server client - RLS (`players_update_self`)
 // still enforces that a session can only ever update its own player row,
 // this endpoint has no elevated privileges.
 

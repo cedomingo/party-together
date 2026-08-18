@@ -6,10 +6,10 @@
 -- Root cause this closes out: the live `who_am_i_assignments_update_own_row`
 -- policy had been hand-patched directly against the database (SQL editor,
 -- outside any tracked migration) to call a function named
--- `current_player_id_for_session(session_id uuid)` — a function that never
+-- `current_player_id_for_session(session_id uuid)` - a function that never
 -- existed anywhere in this repo. It silently returned null for confirmed-
 -- valid rows, so the policy's `player_id = null` comparison was never true,
--- so every guess UPDATE matched 0 rows with no error — surfacing as "you
+-- so every guess UPDATE matched 0 rows with no error - surfacing as "you
 -- don't have a character assigned for this round" for players who
 -- genuinely did have one.
 --
@@ -18,7 +18,7 @@
 -- 20260806120500_who_am_i_identity_protection.sql already specifies
 -- (current_player_id_in_room, the version-controlled helper from
 -- 20260806120300_helper_functions.sql). It was never committed back to
--- this migrations folder until now — this file makes that live change
+-- this migrations folder until now - this file makes that live change
 -- reproducible from a clean `supabase db push` instead of living only as
 -- an untracked hand-edit.
 --
@@ -32,7 +32,7 @@
 -- 20260807160000 (cleanup) already established that once this policy is
 -- correct, current_player_id_in_room()/auth.uid()/the UPDATE-under-RLS
 -- path evaluate exactly as intended. A separate, unrelated bug (players
--- dropped from the start-of-round roster by a stale `connected` filter —
+-- dropped from the start-of-round roster by a stale `connected` filter -
 -- see 20260807160000's comment and app/api/games/who-am-i/start/route.ts)
 -- accounted for the missing-assignment-row cases seen after this policy
 -- fix. Both are now fixed; this migration only concerns the RLS policy.

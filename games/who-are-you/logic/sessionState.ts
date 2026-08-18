@@ -1,5 +1,5 @@
 // Pure session-state shape for "Who Are You?" (WHO-ARE-YOU-SPEC.md §3, §6, §8).
-// No React, no I/O — shared by the start route, begin-turns route, and RoomView.
+// No React, no I/O - shared by the start route, begin-turns route, and RoomView.
 //
 // Step 1 only ever produced phase "setup". Step 2 extends this same state
 // shape: lobby-configurable modes live on both phases, and once every
@@ -23,7 +23,7 @@ export const DEFAULT_FIRST_WIN_ENDS = false;
 export interface WhoAreYouSetupState {
   phase: "setup";
   /**
-   * Player ids, fixed for the whole session, established at game start —
+   * Player ids, fixed for the whole session, established at game start -
    * same join-order convention as who-am-i's `turnOrder`.
    */
   turnOrder: string[];
@@ -61,7 +61,7 @@ export function isWhoAreYouSetupState(value: unknown): value is WhoAreYouSetupSt
   if (!Array.isArray(v.turnOrder) || !v.turnOrder.every((id) => typeof id === "string")) {
     return false;
   }
-  // Step 1 sessions may lack baseMode/firstWinEnds — normalize in place so
+  // Step 1 sessions may lack baseMode/firstWinEnds - normalize in place so
   // readers always see a complete setup state.
   if (v.baseMode !== "guess-everyone" && v.baseMode !== "rival-match") {
     (v as { baseMode: WhoAreYouBaseMode }).baseMode = DEFAULT_BASE_MODE;
@@ -84,7 +84,7 @@ export function isWhoAreYouSessionState(value: unknown): value is WhoAreYouSessi
   const v = value as Record<string, unknown>;
   if (v.phase === "setup") return isWhoAreYouSetupState(value);
   if (v.phase === "turns") {
-    // Lightweight shape check — turnState.isWhoAreYouTurnsState is canonical
+    // Lightweight shape check - turnState.isWhoAreYouTurnsState is canonical
     // for the full turns payload.
     return (
       Array.isArray(v.turnOrder) &&

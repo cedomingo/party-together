@@ -1,13 +1,13 @@
 -- ---------------------------------------------------------------------------
 -- Avatar look persistence: store each player's chosen mushroom (color) and
 -- accessory alongside their nickname, so room members actually see each
--- other's look (not just a name) — previously the avatar creator
+-- other's look (not just a name) - previously the avatar creator
 -- (app/components/AvatarCreator.tsx) was purely client-side and these
 -- choices never left the browser.
 --
 -- Indices, not names/ids: matches how the client already tracks selection
 -- (lib/avatar.ts's MUSHROOMS/ACCESSORIES arrays), and keeps this table
--- decoupled from the specific art catalog — renaming/reordering swatches in
+-- decoupled from the specific art catalog - renaming/reordering swatches in
 -- lib/avatar.ts never requires a migration. `mushroom_index` defaults to 0
 -- (not nullable) since every player has *some* look; `accessory_index`
 -- defaults to 0, which lib/avatar.ts reserves for "None".

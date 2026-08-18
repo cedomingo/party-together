@@ -1,6 +1,6 @@
 "use client";
 
-// "Who Are You?" in-room view — Setup (WHO-ARE-YOU-SPEC.md §3) plus Step 2
+// "Who Are You?" in-room view - Setup (WHO-ARE-YOU-SPEC.md §3) plus Step 2
 // gameplay: per-opponent boards (§4), guessing (§5), turn loop (§6), and
 // recap (§9). Reuses Who Am I's messaging-app layout (one conversation per
 // other player), but swaps in the viewer's board for the selected opponent
@@ -72,7 +72,7 @@ function formatAnswer(value: AnswerValue): string {
   return `"${value}"`;
 }
 
-/** Shared "How to Play" modal — rendered by both the setup and turns phases
+/** Shared "How to Play" modal - rendered by both the setup and turns phases
  *  so the pick-a-character screen carries the same topbar chrome as the
  *  playing board. */
 function WhoAreYouHowToPlayModal({
@@ -97,7 +97,7 @@ function WhoAreYouHowToPlayModal({
         <h2 id="who-are-you-howtoplay-heading">How to Play</h2>
         <p>{description}</p>
         <ul>
-          <li>Each opponent has their own board — cross-offs don&rsquo;t carry over.</li>
+          <li>Each opponent has their own board - cross-offs don&rsquo;t carry over.</li>
           <li>On your turn, ask (or guess) each unsolved opponent once.</li>
           <li>A correct guess solves that opponent only; a wrong guess wastes their slot this turn.</li>
         </ul>
@@ -145,7 +145,7 @@ export function WhoAreYouRoomView({
   const [ownSelection, setOwnSelection] = useState<OwnSelectionRow | null>(null);
   const [readyPlayerIds, setReadyPlayerIds] = useState<Set<string>>(new Set());
   const [boardsByTarget, setBoardsByTarget] = useState<Map<string, BoardRow>>(new Map());
-  // Local-first cross-off state per target board — mirrors Who Am I's
+  // Local-first cross-off state per target board - mirrors Who Am I's
   // `crossedOff` exactly. Seeded from the DB only on initial load (and the
   // begin-turns board reload), then updated optimistically on tap and
   // persisted best-effort. The realtime and resync handlers deliberately do
@@ -176,7 +176,7 @@ export function WhoAreYouRoomView({
   const [answering, setAnswering] = useState(false);
   const [doneError, setDoneError] = useState<string | null>(null);
   const [endingTurn, setEndingTurn] = useState(false);
-  // "I've asked/guessed this opponent (player id) and their answer is in —
+  // "I've asked/guessed this opponent (player id) and their answer is in -
   // waiting for the player to press "I'm Done" before the UI moves to the
   // next chat." The game state itself advances server-side; this only
   // paces the UI (no auto-jumping between chats mid-turn), and tracks the
@@ -597,7 +597,7 @@ export function WhoAreYouRoomView({
 
   // ---- board cross-offs (per selected opponent) --------------------------
   const selectedBoard = selectedPlayerId ? boardsByTarget.get(selectedPlayerId) : undefined;
-  // Local-first (see crossedOffByTarget above) — realtime/resync never
+  // Local-first (see crossedOffByTarget above) - realtime/resync never
   // overwrite it, so a tap is never stomped by a stale board echo.
   const crossedOff = useMemo(
     () => crossedOffByTarget.get(selectedPlayerId ?? "") ?? new Set<string>(),
@@ -688,7 +688,7 @@ export function WhoAreYouRoomView({
     // Auto-select only when the game is directing *us* somewhere we haven't
     // already engaged with: answering someone's question, or a fresh ask
     // target. Never yank the selection off the chat we just asked once the
-    // answer is in — that's the manual "I'm Done → next chat" pacing.
+    // answer is in - that's the manual "I'm Done → next chat" pacing.
     if (isMyTurnToAnswer && askerId) {
       setSelectedPlayerId(askerId);
       setGuessMode(false);
@@ -698,7 +698,7 @@ export function WhoAreYouRoomView({
     }
   }, [isMyTurnToAsk, askTargetId, isMyTurnToAnswer, askerId, pendingAdvanceId]);
 
-  // A new asker (new turn) starts fresh — no pending advance carries over.
+  // A new asker (new turn) starts fresh - no pending advance carries over.
   useEffect(() => {
     if (askerId !== currentPlayer.id) setPendingAdvanceId(null);
   }, [askerId, currentPlayer.id]);
@@ -740,7 +740,7 @@ export function WhoAreYouRoomView({
     : [];
   const canAskInSelectedChat = isMyTurnToAsk && askTargetId === selectedPlayerId;
   // After asking (or guessing) an opponent and getting their answer back, the
-  // game state has already moved on to the next target — but we hold the UI
+  // game state has already moved on to the next target - but we hold the UI
   // on the finished chat and show "I'm Done" so the player paces the move
   // themselves instead of the header jumping chats under them.
   const advanceAfterAsk =
@@ -888,9 +888,9 @@ export function WhoAreYouRoomView({
     }
   }
 
-  // ---- top bar: "Leave Game" — non-host players only (the host sees "End
+  // ---- top bar: "Leave Game" - non-host players only (the host sees "End
   // Game" in this same slot instead, wired to endGame above). Purely
-  // client-side — just navigates the player back home; the disconnect
+  // client-side - just navigates the player back home; the disconnect
   // itself is already handled by the same pagehide/visibility effects the
   // platform core uses for any tab-close. --------------------------------
   function handleLeaveGame() {
@@ -977,7 +977,7 @@ export function WhoAreYouRoomView({
     const setupStatus = ownSelection
       ? allPicked
         ? beginTurnsBusy
-          ? "Everyone's picked — starting…"
+          ? "Everyone's picked - starting…"
           : "Everyone's picked! Starting…"
         : "Waiting for players to pick…"
       : "Pick your character";
@@ -1038,7 +1038,7 @@ export function WhoAreYouRoomView({
             {allPicked ? (
               <p className="who-are-you-all-ready" role="status">
                 {beginTurnsBusy
-                  ? "Everyone's picked — starting the turn loop…"
+                  ? "Everyone's picked - starting the turn loop…"
                   : "Everyone's picked! Starting the turn loop…"}
               </p>
             ) : (
@@ -1161,10 +1161,10 @@ export function WhoAreYouRoomView({
       <header className="who-am-i-topbar">
         <div className="who-am-i-topbar-left">
           {/* Hover (desktop) or tap-and-hold (mobile) your own avatar to
-              peek at the character you picked — it cross-fades in over your
+              peek at the character you picked - it cross-fades in over your
               mushroom avatar and fades back when you stop. (Who Are You? is
               the "you know your own character" game, so this is safe to
-              show.) Driven by :hover/:active in CSS — the no-op touch
+              show.) Driven by :hover/:active in CSS - the no-op touch
               handler below is invisible and just makes iOS Safari apply
               :active while touching; no click affordance. */}
           <div
@@ -1219,7 +1219,7 @@ export function WhoAreYouRoomView({
             </svg>
             How to Play
           </button>
-          {/* Host gets "End Game" here instead of "Leave Game" — same slot
+          {/* Host gets "End Game" here instead of "Leave Game" - same slot
               and design as Who Am I's header, so both games read identically. */}
           {currentPlayer.is_host ? (
             <button
@@ -1333,8 +1333,8 @@ export function WhoAreYouRoomView({
                       setGuessMode(false);
                     }}
                     aria-current={isSelected}
-                    aria-label={`${player.nickname} — ${status.label}`}
-                    title={`${player.nickname} — ${status.label}`}
+                    aria-label={`${player.nickname} - ${status.label}`}
+                    title={`${player.nickname} - ${status.label}`}
                   >
                     <AvatarIcon
                       mushroomIndex={player.mushroom_index}
@@ -1386,7 +1386,7 @@ export function WhoAreYouRoomView({
                 <div className="who-am-i-chat-messages">
                   {selectedConversation.length === 0 && (
                     <p className="muted who-am-i-chat-empty">
-                      No questions yet — this conversation is empty.
+                      No questions yet - this conversation is empty.
                     </p>
                   )}
                   {selectedConversation.map((q) => {
@@ -1408,7 +1408,7 @@ export function WhoAreYouRoomView({
                               {iAsked ? "You" : selectedPlayer.nickname}
                             </span>
                             <p>
-                              Guessed <strong>{guessedName}</strong> —{" "}
+                              Guessed <strong>{guessedName}</strong> -{" "}
                               <span
                                 className={
                                   wasCorrect
@@ -1456,8 +1456,6 @@ export function WhoAreYouRoomView({
                             </span>
                             <p>
                               {formatAnswer(answer)}
-                              {answer === "yes" && " ✓"}
-                              {answer === "no" && " ✕"}
                             </p>
                           </div>
                         ) : (
@@ -1569,7 +1567,7 @@ export function WhoAreYouRoomView({
                       {selectedSolved
                         ? `You've solved ${selectedPlayer.nickname}.`
                         : advanceAfterAsk
-                          ? `${pendingAdvanceId ? nicknameFor(pendingAdvanceId) : "They"} answered — press “I'm Done” to continue.`
+                          ? `${pendingAdvanceId ? nicknameFor(pendingAdvanceId) : "They"} answered - press “I'm Done” to continue.`
                           : isReviewingMyTurn
                             ? "Review this turn's answers, then press “I'm Done.”"
                             : `Waiting for your turn to chat with ${selectedPlayer.nickname}.`}
@@ -1591,7 +1589,7 @@ export function WhoAreYouRoomView({
               </h2>
               <p className="muted">
                 {selectedSolved
-                  ? "Solved — this board is locked."
+                  ? "Solved - this board is locked."
                   : "Tap a character to cross it off as you rule it out."}
               </p>
             </div>
@@ -1612,7 +1610,7 @@ export function WhoAreYouRoomView({
 
           {guessMode && (
             <p className="who-am-i-guess-hint" role="status">
-              Tap a card below to guess — a wrong guess wastes this opponent's slot this turn.
+              Tap a card below to guess - a wrong guess wastes this opponent's slot this turn.
             </p>
           )}
           {guessError && (
@@ -1683,8 +1681,8 @@ export function WhoAreYouRoomView({
               {advanceAfterAsk && (
                 <p className="muted">
                   {pendingAdvanceId
-                    ? `${nicknameFor(pendingAdvanceId)} answered — press “I'm Done” to move on.`
-                    : "Answered — press “I'm Done” to move on."}
+                    ? `${nicknameFor(pendingAdvanceId)} answered - press “I'm Done” to move on.`
+                    : "Answered - press “I'm Done” to move on."}
                 </p>
               )}
               <button

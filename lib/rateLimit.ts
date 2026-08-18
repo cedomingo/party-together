@@ -4,13 +4,13 @@ import "server-only";
 // room creation, join, question, and answer submission endpoints ... to
 // prevent spam-turn abuse"). Backed by the `rate_limits` table + atomic
 // `rate_limit_hit` Postgres function (see
-// supabase/migrations/20260806120800_rate_limits.sql) — durable across
+// supabase/migrations/20260806120800_rate_limits.sql) - durable across
 // Vercel's serverless instances, unlike an in-memory counter.
 //
 // Always goes through the service-role admin client: `rate_limits` has RLS
 // enabled with zero policies, so the anon/authenticated roles (i.e. every
 // normal request's own cookie-authenticated client) can't touch it at all.
-// This is infrastructure bookkeeping, not user data — there's no reason a
+// This is infrastructure bookkeeping, not user data - there's no reason a
 // room member's own client should ever read or write it directly.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -42,7 +42,7 @@ interface RateLimitHitRow {
  * Throws `RateLimitError` if `key` has exceeded `limit` hits within the
  * current `windowSeconds` window, otherwise records this call as a hit and
  * returns normally. Fails *open* (allows the request through, logging the
- * failure) if the rate-limit infrastructure itself errors — a broken
+ * failure) if the rate-limit infrastructure itself errors - a broken
  * rate-limit check shouldn't take the whole app down with it; the
  * endpoints this guards still have their own validation/RLS underneath.
  */
@@ -59,13 +59,13 @@ export async function enforceRateLimit(
     .single<RateLimitHitRow>();
 
   if (error) {
-    console.error(`Rate limit check failed for "${config.key}" — allowing request:`, error.message);
+    console.error(`Rate limit check failed for "${config.key}" - allowing request:`, error.message);
     return;
   }
 
   if (!data?.allowed) {
     throw new RateLimitError(
-      "Too many requests — please slow down and try again shortly.",
+      "Too many requests - please slow down and try again shortly.",
       data?.retry_after_seconds ?? config.windowSeconds
     );
   }

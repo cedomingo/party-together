@@ -4,7 +4,7 @@
 -- These are SECURITY DEFINER on purpose: they query `players` directly.
 -- If they were SECURITY INVOKER (the default) and `players` itself has a
 -- policy that calls one of these functions, you get the query planner
--- evaluating players' own RLS while checking players' own RLS — recursive
+-- evaluating players' own RLS while checking players' own RLS - recursive
 -- and fragile. Running as the (table-owning) definer sidesteps that, since
 -- the table owner is exempt from its own RLS policies by default (we never
 -- set FORCE ROW LEVEL SECURITY, so this holds). `search_path` is pinned to

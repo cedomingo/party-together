@@ -1,4 +1,4 @@
-// GameConfig for "Who Are You?" — see /lib/games-registry.ts for the shape
+// GameConfig for "Who Are You?" - see /lib/games-registry.ts for the shape
 // and how this gets wired into the platform.
 //
 // Step 2 adds LobbyOptions for the host-configurable game modes
@@ -60,7 +60,7 @@ function WhoAreYouLobbyOptions({ value, onChange }: GameLobbyOptionsProps) {
             }
           />
           <span>Guess Everyone</span>
-          <span className="muted"> — correctly guess every other player</span>
+          <span className="muted"> - correctly guess every other player</span>
         </label>
         <label className="field field-checkbox">
           <input
@@ -72,7 +72,7 @@ function WhoAreYouLobbyOptions({ value, onChange }: GameLobbyOptionsProps) {
             }
           />
           <span>Rival Match</span>
-          <span className="muted"> — only your assigned rival counts toward a win</span>
+          <span className="muted"> - only your assigned rival counts toward a win</span>
         </label>
       </fieldset>
       <label className="field field-checkbox">
@@ -87,7 +87,7 @@ function WhoAreYouLobbyOptions({ value, onChange }: GameLobbyOptionsProps) {
           }
         />
         <span>First Win Ends Game</span>
-        <span className="muted"> — off: play out the base mode&rsquo;s natural end</span>
+        <span className="muted"> - off: play out the base mode&rsquo;s natural end</span>
       </label>
     </div>
   );
