@@ -72,6 +72,26 @@ export const NICKNAME_MAX_LENGTH = 32;
 // actively-played room never expires mid-game.
 export const ROOM_EXPIRY_HOURS = 24;
 
+// How long a player may go without a heartbeat (`last_seen_at`) before the
+// stale-player sweep treats their seat as abandoned and removes it
+// (sweepStalePlayers). Deliberately ~3x PLAYER_HEARTBEAT_MS: browsers
+// throttle background-tab timers to roughly once a minute, so a player who
+// merely switched tabs still lands comfortably inside this window — only a
+// page that has truly stopped running (closed tab, dead network) drifts
+// past it.
+export const OFFLINE_GRACE_MS = 90_000;
+
+// Room pages (RoomClient, GamesListing) refresh their own player row's
+// `last_seen_at` on this interval so the sweep above can tell a live
+// player from an abandoned seat.
+export const PLAYER_HEARTBEAT_MS = 30_000;
+
+// How often room pages re-run the lobby sweep (see the /api/rooms/sweep
+// route) so the roster / player-count gates reflect who's actually here
+// without waiting for a reload or the authoritative sweep inside the
+// game-start routes.
+export const LOBBY_SWEEP_INTERVAL_MS = 60_000;
+
 // ------------------------------------------------------------------ utils --
 
 export function generateRoomCode(length: number = ROOM_CODE_LENGTH): string {
@@ -499,6 +519,59 @@ export async function setPlayerConnected(
 ): Promise<void> {
   const { error } = await supabase.from("players").update({ connected }).eq("id", playerId);
   if (error) throw new RoomError(error.message);
+}
+
+/**
+ * Marks this session's player row as alive — the heartbeat that keeps
+ * `last_seen_at` fresh so the stale-player sweep never mistakes an
+ * actively-open room page for an abandoned seat. Callers treat failures as
+ * best-effort (a missed ping just makes the sweep see an older timestamp).
+ * RLS (`players_update_self`) restricts the write to the caller's own row.
+ */
+export async function touchPlayerSeen(supabase: SupabaseClient, playerId: string): Promise<void> {
+  const { error } = await supabase
+    .from("players")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("id", playerId);
+  if (error) throw new RoomError(error.message);
+}
+
+/**
+ * Removes players whose `last_seen_at` is older than `graceMs` — seats that
+ * have been offline long enough to be considered abandoned — so the lobby
+ * roster, the max_players cap, and the game start all reflect only the
+ * people actually here. The host is never swept (is_host rows are
+ * excluded); callers only run this for `lobby` rooms (the sweep route and
+ * the game-start routes both check status first). Requires the admin
+ * client: RLS deliberately only lets a player delete their own row
+ * (`players_delete_self`). Returns the ids of the removed players.
+ *
+ * If the players.last_seen_at migration hasn't been applied yet, the delete
+ * fails with Postgres code 42703 (undefined column) — carried on the thrown
+ * RoomError as `.code` so callers can fall back to the old behavior rather
+ * than breaking game start.
+ */
+export async function sweepStalePlayers(
+  supabaseAdmin: SupabaseClient,
+  roomId: string,
+  graceMs: number = OFFLINE_GRACE_MS
+): Promise<string[]> {
+  const cutoff = new Date(Date.now() - graceMs).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("players")
+    .delete()
+    .eq("room_id", roomId)
+    .eq("is_host", false)
+    .lt("last_seen_at", cutoff)
+    .select("id");
+
+  if (error) {
+    const wrapped = new RoomError(error.message) as RoomError & { code?: string };
+    wrapped.code = error.code;
+    throw wrapped;
+  }
+
+  return ((data ?? []) as { id: string }[]).map((p) => p.id);
 }
 
 /**

@@ -282,18 +282,59 @@ a {
   }
 }
 
+/* -----------------------------------------------------------------------
+   Hand-drawn paper borders (public/ui/elements/borders/) — each PNG is
+   authored at a fixed size; apply the variant whose aspect ratio best
+   matches the container so strokes stay crisp instead of stretched.
+   No border-radius on framed panels: clipping would shave the scribble
+   corners. The background-image on each panel below is only the no-JS/
+   pre-hydration fallback — PaperBorderAuto.tsx (mounted in app/layout.tsx)
+   observes every framed container at runtime and swaps in the closest-
+   matching asset for its actual size, so responsive re-layouts (stacked
+   topbar on mobile, sidebar turning into a rail, etc.) never stretch the
+   strokes.
+   ----------------------------------------------------------------------- */
+.paper-border {
+  border: none;
+  background-color: var(--paper);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.paper-border--800x800 {
+  background-image: url("/ui/elements/borders/800x800.png");
+}
+
+.paper-border--800x1200 {
+  background-image: url("/ui/elements/borders/800x1200.png");
+}
+
+.paper-border--800x1600 {
+  background-image: url("/ui/elements/borders/800x1600.png");
+}
+
+.paper-border--1024x800 {
+  background-image: url("/ui/elements/borders/1024x800.png");
+}
+
+.paper-border--1600x800 {
+  background-image: url("/ui/elements/borders/1600x800.png");
+}
+
+.paper-border--2400x800 {
+  background-image: url("/ui/elements/borders/2400x800.png");
+}
+
 /* Illustrated-paper card: cream surface framed by a hand-drawn border
-   (public/ui/avatar/elements/border5.png, drawn to stretch with
-   background-size) instead of a plain CSS outline — the frame's irregular
-   scribble corners are the point, so no border-radius here (clipping
-   would shave them off). */
+   instead of a plain CSS outline. Size picked automatically from the
+   six assets in public/ui/elements/borders/. */
 .panel-form {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  background-color: var(--paper);
   border: none;
-  background-image: url("/ui/avatar/elements/border5.png");
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/1600x800.png");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
@@ -405,14 +446,44 @@ button:disabled {
   overflow: hidden;
   text-align: left;
   font: 500 0.95rem/1.35 var(--font-body);
-  background: var(--paper);
-  border: 2.5px solid var(--border);
-  border-radius: var(--radius-md);
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border: none;
+  /* No border-radius: the frame's irregular scribble corners are the
+     point, and rounding the card would shave them off. The global
+     `button` rule rounds everything by default — this card opts out. */
+  border-radius: 0;
   box-shadow: var(--shadow-flat-sm);
 }
 
+/* The global :focus-visible rule re-rounds focused buttons (border-radius:
+   4px to shape its outline) — keep the frame's scribble corners intact
+   when keyboard-navigating the grid too. */
+.game-picker-card:focus-visible {
+  border-radius: 0;
+}
+
+/* The global `button:hover` rule styles via the `background` shorthand,
+   which resets background-image/size/repeat to their initial values — on
+   this card that would shrink the frame PNG to its natural size, tile it
+   across the card, and flood the surface with the accent color, making the
+   paper border vanish on hover (and, on touch devices, for as long as the
+   tap's stuck :hover lasts). Re-assert the frame here: background-image
+   is the runtime-picked asset PaperBorderAuto sets inline (the rule below
+   is just the no-JS fallback), and the lift keeps the card feeling
+   pressable without breaking the border. */
+.game-picker-card:hover:not(:disabled) {
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 5px 0 rgba(47, 42, 34, 0.2);
+}
+
 .game-picker-card.selected {
-  border-color: var(--accent);
   box-shadow:
     var(--shadow-flat-sm),
     0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
@@ -438,6 +509,13 @@ button:disabled {
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.55rem 0.7rem 0.65rem;
+  /* Fixed floor for the name plus up to two description lines, so every
+     card in the grid is the same height no matter how much text a
+     description has (shorter text just leaves a little paper below).
+     Also keeps the aspect ratio — and therefore the paper-border asset
+     PaperBorderAuto picks — identical across cards, so side-by-side
+     frames match. */
+  min-height: 4.85rem;
 }
 
 .game-picker-name {
@@ -448,23 +526,29 @@ button:disabled {
   color: var(--ink-45);
   font-size: 0.82rem;
   line-height: 1.35;
+  /* Clip long descriptions at two lines so a verbose card can't grow
+     taller than its neighbours. The full text stays available to screen
+     readers via the card button's aria-label. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* -----------------------------------------------------------------------
    Avatar creator — sits above the Create/Join two-up on the home page and
    every per-game landing page (app/components/RoomForms.tsx). Same paper
-   card language as .panel-form (hand-drawn border5 frame instead of a CSS
-   outline) so it reads as part of the family rather than a bolted-on
-   widget.
+   card language as .panel-form so it reads as part of the family rather
+   than a bolted-on widget. Border size picked at runtime.
    ----------------------------------------------------------------------- */
 .avatar-creator {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.9rem;
-  background-color: var(--paper);
   border: none;
-  background-image: url("/ui/avatar/elements/border5.png");
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/1600x800.png");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
@@ -789,9 +873,11 @@ button:disabled {
   text-align: center;
   padding: 3rem 1.5rem;
   margin-top: 1.5rem;
-  background: var(--paper);
-  border: 2.5px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/1600x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
 }
 
@@ -843,9 +929,11 @@ button:disabled {
   align-items: center;
   gap: 0.35rem;
   padding: 2.5rem 1rem;
-  background: var(--paper);
-  border: 2px dashed var(--ink-45);
-  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   text-align: center;
 }
 
@@ -883,9 +971,11 @@ button:disabled {
   max-width: 1180px;
   margin: 0 auto 1rem;
   padding: 0.85rem 1.1rem;
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/2400x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat-sm);
 }
 
@@ -1074,9 +1164,11 @@ button:disabled {
 }
 
 .who-am-i-modal {
-  background: var(--card-surface);
-  border: 2.5px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: none;
+  background-color: var(--card-surface);
+  background-image: url("/ui/elements/borders/800x800.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat);
   padding: 1.5rem;
   max-width: 420px;
@@ -1146,9 +1238,11 @@ button:disabled {
 /* ---- Sidebar: collapsed to an avatar-icon rail, one per conversation -- */
 .who-am-i-sidebar {
   grid-area: sidebar;
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x1600.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat-sm);
   padding: 0.6rem 0.4rem;
   max-height: 640px;
@@ -1234,9 +1328,11 @@ button:disabled {
 .who-am-i-chat-panel {
   display: flex;
   flex-direction: column;
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x1600.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat-sm);
   height: 550px;
   overflow: hidden;
@@ -1252,9 +1348,11 @@ button:disabled {
    `-expanded` modifier RoomView.tsx toggles on click/tap, opens it up to
    the full scrollable history. */
 .who-am-i-player-log {
-  background: var(--paper);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  background-color: var(--paper);
+  background-image: url("/ui/elements/borders/800x1200.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: var(--shadow-flat-sm);
   padding: 0.65rem 0.8rem;
   max-height: 3.9rem;

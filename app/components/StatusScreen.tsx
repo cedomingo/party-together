@@ -22,26 +22,37 @@ interface StatusScreenProps {
   children?: ReactNode;
   /** Show a "Back to home" link. Defaults to true for info/error, false for loading. */
   showHomeLink?: boolean;
+  /** Render only the state-screen block, without the <main> wrapper or home
+   * link — for embedding inside a page that already renders its own <main>
+   * (e.g. the games listing's in-place loading state while a room is being
+   * created/switched). No nested <main>, no duplicate "main-content" id. */
+  embedded?: boolean;
 }
 
-export function StatusScreen({ kind, title, children, showHomeLink }: StatusScreenProps) {
+export function StatusScreen({ kind, title, children, showHomeLink, embedded }: StatusScreenProps) {
   const role = kind === "error" ? "alert" : "status";
   const shouldShowHomeLink = showHomeLink ?? kind !== "loading";
 
+  const panel = (
+    <div
+      className={`state-screen state-screen-${kind}`}
+      role={role}
+      aria-live={kind === "loading" ? undefined : "polite"}
+      aria-busy={kind === "loading" ? "true" : undefined}
+    >
+      {kind === "loading" && (
+        <span className="state-spinner" aria-hidden="true" />
+      )}
+      <h1>{title}</h1>
+      {children && <div className="state-screen-body">{children}</div>}
+    </div>
+  );
+
+  if (embedded) return panel;
+
   return (
     <main className="page" id="main-content">
-      <div
-        className={`state-screen state-screen-${kind}`}
-        role={role}
-        aria-live={kind === "loading" ? undefined : "polite"}
-        aria-busy={kind === "loading" ? "true" : undefined}
-      >
-        {kind === "loading" && (
-          <span className="state-spinner" aria-hidden="true" />
-        )}
-        <h1>{title}</h1>
-        {children && <div className="state-screen-body">{children}</div>}
-      </div>
+      {panel}
       {shouldShowHomeLink && (
         <p className="state-screen-actions">
           <Link href="/">Back to home</Link>

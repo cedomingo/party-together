@@ -24,6 +24,9 @@ import {
   listPlayers,
   setPlayerConnected,
   startGame,
+  touchPlayerSeen,
+  LOBBY_SWEEP_INTERVAL_MS,
+  PLAYER_HEARTBEAT_MS,
   RoomError,
   type Player,
   type Room,
@@ -224,6 +227,47 @@ export function RoomClient({ code, game }: { code: string; game: string }) {
     // Same rationale as the effect above — keyed on ids, not the objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, currentPlayer?.id]);
+
+  // ---- heartbeat: keep last_seen_at fresh -------------------------------
+  // The stale-player sweep (lib/rooms sweepStalePlayers) removes seats that
+  // have been offline past the grace window so a dead tab can't block the
+  // next game start. `connected` alone can't carry that signal (pagehide
+  // flips it false the instant a tab is backgrounded), so the room pages
+  // heartbeat `last_seen_at` here instead. Best-effort: a missed ping just
+  // makes the sweep see an older timestamp.
+  useEffect(() => {
+    const playerId = currentPlayer?.id;
+    if (!playerId) return;
+    const ping = () => {
+      touchPlayerSeen(supabase, playerId).catch(() => undefined);
+    };
+    ping();
+    const timer = setInterval(ping, PLAYER_HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [supabase, currentPlayer?.id]);
+
+  // ---- lobby sweep: drop seats offline past the grace window ------------
+  // Runs while the room is still in the lobby so the roster (and the host's
+  // Start gate) reflects who's actually here without waiting for the start
+  // route's authoritative sweep. Any member can trigger it — it's
+  // idempotent and cheap. Sweeping mid-game is meaningless (and could
+  // orphan session state), so it stops once the room leaves the lobby.
+  useEffect(() => {
+    if (!room || room.status !== "lobby") return;
+    const sweep = () => {
+      fetch("/api/rooms/sweep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: room.id }),
+      }).catch(() => undefined);
+    };
+    sweep();
+    const timer = setInterval(sweep, LOBBY_SWEEP_INTERVAL_MS);
+    return () => clearInterval(timer);
+    // Keyed on ids/status, not `room` itself — same rationale as the
+    // realtime effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, room?.id, room?.status]);
 
   // ---- mark disconnected on actual page-leave (best effort) ------------
   useEffect(() => {

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PaperBorderAuto } from "./components/PaperBorderAuto";
 import "./globals.css";
 
 // Platform-wide default metadata. Per-game landing pages override this
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <PaperBorderAuto />
         {/* Visually hidden until focused (see .skip-link in globals.css) —
             SPEC.md §11 accessibility: lets a keyboard user jump past the
             repeated header controls straight to each page's <main id=

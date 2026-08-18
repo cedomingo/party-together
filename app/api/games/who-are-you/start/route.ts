@@ -4,6 +4,8 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sweepStalePlayers } from "@/lib/rooms";
 import {
   DEFAULT_BASE_MODE,
   DEFAULT_FIRST_WIN_ENDS,
@@ -69,6 +71,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only the host can start the game." }, { status: 403 });
   }
 
+  // Drop seats that have been offline past the grace window BEFORE deciding
+  // who's playing — who-are-you's setup phase waits on every player to pick
+  // a character, so an abandoned tab would stall the game before it ever
+  // really starts. See sweepStalePlayers in lib/rooms; keyed on
+  // `last_seen_at` (a 30s heartbeat), not the twitchy `connected` flag.
+  const supabaseAdmin = createSupabaseAdminClient();
+  try {
+    await sweepStalePlayers(supabaseAdmin, roomId);
+  } catch (err) {
+    // players.last_seen_at doesn't exist yet (migration not applied) —
+    // fall back to the old behavior rather than blocking the start.
+    if ((err as { code?: string })?.code !== "42703") throw err;
+  }
+
   const { data: roomPlayers, error: playersError } = await supabase
     .from("players")
     .select("id")
@@ -82,7 +98,11 @@ export async function POST(request: Request) {
   const playerIds = (roomPlayers ?? []).map((p) => p.id as string);
   if (playerIds.length < 2) {
     return NextResponse.json(
-      { error: "At least 2 players are needed to start the game." },
+      {
+        error: `At least 2 players are needed to start the game — only ${playerIds.length} player${
+          playerIds.length === 1 ? "" : "s"
+        } ${playerIds.length === 1 ? "is" : "are"} still in the room.`,
+      },
       { status: 400 }
     );
   }

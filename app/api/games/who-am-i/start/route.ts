@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assignCharacters, AssignmentError } from "@/games/who-am-i/logic/assignCharacters";
+import { sweepStalePlayers } from "@/lib/rooms";
 import {
   DEFAULT_GAME_MODE,
   initialTurnState,
@@ -94,6 +95,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only the host can start the game." }, { status: 403 });
   }
 
+  // Everything from here on is privileged: reading the full character
+  // roster for assignment purposes is fine either way, but writing
+  // game_sessions/who_am_i_assignments and flipping room status requires
+  // the admin client.
+  const supabaseAdmin = createSupabaseAdminClient();
+
+  // Drop seats that have been offline past the grace window BEFORE deciding
+  // who's playing — a tab that died mid-lobby shouldn't leave the game
+  // assigning a character (and a turn) to someone who isn't coming back, or
+  // count toward the minPlayers gate. See sweepStalePlayers in lib/rooms.
+  // Deliberately keyed on `last_seen_at` (a 30s heartbeat from the room
+  // pages), NOT `connected` (which pagehide flips false the instant a tab
+  // is backgrounded — see the note on the player query below): a player
+  // who merely switched tabs still heartbeats inside the grace window.
+  try {
+    await sweepStalePlayers(supabaseAdmin, roomId);
+  } catch (err) {
+    // players.last_seen_at doesn't exist yet (migration not applied) —
+    // fall back to the old behavior (every room member plays) rather than
+    // blocking the start.
+    if ((err as { code?: string })?.code !== "42703") throw err;
+  }
+
   // Ordered by join order — this doubles as turnOrder below (SPEC.md §8
   // point 1: "join order or randomized"; join order is simpler to reason
   // about and keeps "who's up next" predictable for players watching the
@@ -109,9 +133,12 @@ export async function POST(request: Request) {
   // easily coincide with the exact moment everyone is tapping their phone
   // to react to the host clicking Start. Filtering on it here silently
   // dropped real participants from the round with no way to ever recover
-  // (nothing revisits this list after start). A player who genuinely isn't
-  // in the room yet is already excluded by definition (they have no row
-  // to select), and anyone joining *after* this point is already blocked
+  // (nothing revisits this list after start). Abandoned seats are instead
+  // removed *before* this list is built by the sweep above (which requires
+  // the player to have stopped heartbeating for the full grace window, not
+  // just to have backgrounded a tab). A player who genuinely isn't in the
+  // room yet is already excluded by definition (they have no row to
+  // select), and anyone joining *after* this point is already blocked
   // separately (room leaves `lobby`, enforced by both the join route and
   // RLS) — so this list is exactly "current room members," full stop.
   const { data: roomPlayers, error: playersError } = await supabase
@@ -127,16 +154,14 @@ export async function POST(request: Request) {
   const playerIds = (roomPlayers ?? []).map((p) => p.id as string);
   if (playerIds.length < 2) {
     return NextResponse.json(
-      { error: "At least 2 players are needed to start the game." },
+      {
+        error: `At least 2 players are needed to start the game — only ${playerIds.length} player${
+          playerIds.length === 1 ? "" : "s"
+        } ${playerIds.length === 1 ? "is" : "are"} still in the room.`,
+      },
       { status: 400 }
     );
   }
-
-  // Everything from here on is privileged: reading the full character
-  // roster for assignment purposes is fine either way, but writing
-  // game_sessions/who_am_i_assignments and flipping room status requires
-  // the admin client.
-  const supabaseAdmin = createSupabaseAdminClient();
 
   const { data: characterRows, error: charactersError } = await supabaseAdmin
     .from("characters")

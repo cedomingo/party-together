@@ -3,8 +3,10 @@
 // The /games listing page's interactive half (server page: app/games/page.tsx).
 //
 // browse mode (no `roomCode`): renders the shared <GamePicker>; clicking a
-// card navigates to that game's landing page (/games/[game]) where a room
-// can be created for it.
+// card creates a room for that game on the spot — using the saved
+// avatar/name (lib/avatar.ts localStorage) — and goes straight to the
+// room. The per-game landing page (/games/[game], with its avatar creator
+// and Create form) still exists for direct/SEO visits but is skipped here.
 //
 // room mode (?room=CODE): this page IS the room's pre-game waiting room —
 // the room may be a game-less shell (just created on the home page) or a
@@ -15,6 +17,12 @@
 // that game (app/api/rooms/switch-game/route.ts — host-only) and redirects
 // into its waiting room. Phase D gates this behind an avatar-first join
 // flow for non-members; Phase E auto-redirects members when the host picks.
+//
+// Either way, clicking a game swaps the whole listing for the shared
+// loading screen (embedded <StatusScreen>) BEFORE the create/switch
+// request goes out — the user gets instant "something is happening"
+// feedback instead of a dead wait on the grid. On failure the state
+// clears and the game list (with the error) comes right back.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,13 +32,17 @@ import {
   getRoomByCode,
   listPlayers,
   setPlayerConnected,
+  touchPlayerSeen,
+  LOBBY_SWEEP_INTERVAL_MS,
+  PLAYER_HEARTBEAT_MS,
   RoomError,
   type Player,
   type Room,
 } from "@/lib/rooms";
-import { joinRoomByCodeViaApi } from "@/lib/rooms/client";
+import { createRoomViaApi, joinRoomByCodeViaApi } from "@/lib/rooms/client";
 import { GamePicker } from "@/app/components/GamePicker";
 import { RoomRoster } from "@/app/components/RoomRoster";
+import { StatusScreen } from "@/app/components/StatusScreen";
 import { AvatarCreator } from "@/app/components/AvatarCreator";
 import {
   loadStoredAvatar,
@@ -62,9 +74,12 @@ export function GamesListing({
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
   // ---- game-selection / invite state (shared) ---------------------------
-  // Which game's card is currently mid-switch (blocks double-clicks while
-  // the route + redirect are in flight).
-  const [switchingGameId, setSwitchingGameId] = useState<string | null>(null);
+  // Which game's card was clicked and is now mid-launch (create in browse
+  // mode, switch in room mode). Non-null swaps the whole listing for the
+  // loading screen below and blocks double-clicks; it stays set until the
+  // redirect succeeds (navigation unmounts this component) or the request
+  // fails (cleared in the catch below).
+  const [launchingGameId, setLaunchingGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Same copy-invite-link pattern as RoomClient.tsx's handleCopyLink/
   // copyLabel (label flips to confirm for a couple of seconds) — mirrored
@@ -227,6 +242,47 @@ export function GamesListing({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, room?.id, currentPlayer?.id]);
 
+  // ---- heartbeat: keep last_seen_at fresh -------------------------------
+  // The stale-player sweep (lib/rooms sweepStalePlayers) removes seats that
+  // have been offline past the grace window so a dead tab can't block the
+  // room from starting a game (this page is the lobby for game-less rooms).
+  // `connected` alone can't carry that signal (pagehide flips it false the
+  // instant a tab is backgrounded), so the room pages heartbeat
+  // `last_seen_at` here instead. Best-effort: a missed ping just makes the
+  // sweep see an older timestamp.
+  useEffect(() => {
+    const playerId = currentPlayer?.id;
+    if (!playerId) return;
+    const ping = () => {
+      touchPlayerSeen(supabase, playerId).catch(() => undefined);
+    };
+    ping();
+    const timer = setInterval(ping, PLAYER_HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [supabase, currentPlayer?.id]);
+
+  // ---- lobby sweep: drop seats offline past the grace window ------------
+  // Runs while the room is still in the lobby so the roster (and any
+  // player-count gates) reflects who's actually here without waiting for
+  // the game-start routes' authoritative sweep. Any member can trigger it —
+  // it's idempotent and cheap. Stops once the room leaves the lobby.
+  useEffect(() => {
+    if (!room || room.status !== "lobby") return;
+    const sweep = () => {
+      fetch("/api/rooms/sweep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: room.id }),
+      }).catch(() => undefined);
+    };
+    sweep();
+    const timer = setInterval(sweep, LOBBY_SWEEP_INTERVAL_MS);
+    return () => clearInterval(timer);
+    // Keyed on ids/status, not `room` itself — same rationale as the
+    // realtime effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, room?.id, room?.status]);
+
   // ---- mark disconnected on actual page-leave (best effort) --------------
   const currentPlayerIdRef = useRef<string | null>(null);
   currentPlayerIdRef.current = currentPlayer?.id ?? null;
@@ -250,14 +306,31 @@ export function GamesListing({
   }, []);
 
   async function handleSelect(gameId: string) {
-    if (!roomCode) {
-      router.push(`/games/${gameId}`);
-      return;
-    }
-    if (switchingGameId) return;
-    setSwitchingGameId(gameId);
+    if (launchingGameId) return;
+    // Set before any await: the render below swaps to the loading screen
+    // immediately, so the player never stares at a dead grid while the
+    // create/switch request is in flight.
+    setLaunchingGameId(gameId);
     setError(null);
     try {
+      if (!roomCode) {
+        // Browse mode: create a room for this game right away with the
+        // saved avatar (name/look from localStorage — there's no avatar
+        // creator on this page) and go straight to the room. If no name
+        // was ever saved, fall back to a plain "Player" so creation never
+        // fails on a missing nickname (sanitizeNickname requires 1-32
+        // chars).
+        const avatar = loadStoredAvatar();
+        const { code } = await createRoomViaApi({
+          gameId,
+          nickname: avatar.name.trim() || "Player",
+          mushroomIndex: avatar.mushroomIndex,
+          accessoryIndex: avatar.accessoryIndex,
+        });
+        router.push(`/games/${gameId}/room/${code}`);
+        return;
+      }
+
       const response = await fetch("/api/rooms/switch-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -269,8 +342,9 @@ export function GamesListing({
       // back in the lobby waiting for the host to start it).
       router.push(`/games/${gameId}/room/${roomCode}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't switch games.");
-      setSwitchingGameId(null);
+      // Back to the game list, with the failure visible on it.
+      setError(err instanceof Error ? err.message : "Couldn't start the game.");
+      setLaunchingGameId(null);
     }
   }
 
@@ -306,6 +380,15 @@ export function GamesListing({
     } finally {
       setJoining(false);
     }
+  }
+
+  // A game click replaces the whole listing with the shared loading screen
+  // (same visual language as RoomClient's "Loading room…") until the room
+  // redirect lands or the request fails. `embedded` because this page
+  // already renders its own <main id="main-content">.
+  if (launchingGameId) {
+    const game = games.find((g) => g.id === launchingGameId);
+    return <StatusScreen kind="loading" title={`Starting ${game?.displayName ?? launchingGameId}…`} embedded />;
   }
 
   return (

@@ -1505,7 +1505,7 @@ export function WhoAreYouRoomView({
                             disabled={answering}
                             aria-label="Answer yes"
                           >
-                            Yes ✓
+                            Yes
                           </button>
                           <button
                             type="button"
@@ -1513,7 +1513,7 @@ export function WhoAreYouRoomView({
                             disabled={answering}
                             aria-label="Answer no"
                           >
-                            No ✕
+                            No
                           </button>
                           <button
                             type="button"
@@ -1612,7 +1612,7 @@ export function WhoAreYouRoomView({
 
           {guessMode && (
             <p className="who-am-i-guess-hint" role="status">
-              Tap a card below to guess — a wrong guess wastes this opponent&rsquo;s slot this turn.
+              Tap a card below to guess — a wrong guess wastes this opponent's slot this turn.
             </p>
           )}
           {guessError && (
