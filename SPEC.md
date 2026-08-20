@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-Build **Party Together**, a skribbl.io-style web platform where a host creates a room, shares a link, and friends join to play browser-based party games together. The platform must be architected so that **new games can be added later without refactoring the core** (room system, lobby, chat, presence, etc.).
+Build **Party Together**, a online multiplayer style web platform where a host creates a room, shares a link, and friends join to play browser-based party games together. The platform must be architected so that **new games can be added later without refactoring the core** (room system, lobby, chat, presence, etc.).
 
 The first game to ship is **"Who Am I?"** - a party game (working title only, not to be branded "Guess Who" for IP reasons) where each player is secretly assigned a character identity that only *other* players can see. On their turn, a player asks a yes/no question publicly to the room, and every other player answers Yes/No one at a time. Players use a visual board of 25 characters to cross off candidates as they narrow down who they are.
 

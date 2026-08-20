@@ -1,6 +1,6 @@
 # Party Together
 
-Skribbl.io-style party game platform. Host creates a room, shares a link,
+party game platform. Host creates a room, shares a link,
 friends join and play browser-based party games together. First game:
 **Who Am I?**
 
