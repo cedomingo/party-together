@@ -38,6 +38,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/site.webmanifest" />
+      </head>
       <body>
         <PaperBorderAuto />
         {/* Visually hidden until focused (see .skip-link in globals.css) -

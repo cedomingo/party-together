@@ -1,0 +1,25 @@
+{
+  "name": "Party Together – Free Online Party Games",
+  "short_name": "Party Together",
+  "description": "Play free online multiplayer party games with friends in your browser. No sign-up, no download, and no account required.",
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#d9a52f",
+  "background_color": "#fdf5ec",
+  "display": "standalone"
+}
