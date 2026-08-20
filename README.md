@@ -1,51 +1,37 @@
-# Party Together
+# Round 2 files — structured data + shared site-url helper
 
-party game platform. Host creates a room, shares a link,
-friends join and play browser-based party games together. First game:
-**Who Am I?**
+The patch failed because your working copy doesn't match byte-for-byte
+(probably line-ending differences from Windows, or a small manual edit).
+Easiest fix: just replace these 5 files directly with the versions here —
+no `git apply` needed.
 
-See `SPEC.md` for the full build spec.
+## Copy these files into your repo (same relative paths)
 
-## Status
+- `lib/site.ts` **(new file — create it)**
+- `app/sitemap.ts` **(overwrite)**
+- `app/robots.ts` **(overwrite — or create it, if round 1 never actually
+  created it; that may be why "No such file or directory" showed up)**
+- `app/layout.tsx` **(overwrite)**
+- `app/games/[game]/page.tsx` **(overwrite)**
 
-**Phase 2 - Platform Core: Rooms & Lobby.** Create/join/lobby flow works
-end-to-end: short room codes, join by link or code, nickname-only identity
-(Supabase Anonymous Auth), live lobby (connected players + host badge),
-host-only "Start Game" stub (flips room status, zero game logic), best-effort
-disconnect/reconnect handling, and a cron-ready room expiry cleanup endpoint.
-See `supabase/PHASE1_NOTES.md` for the Phase 1 data model/RLS writeup.
+On Windows, drag each file from this zip into the matching folder in
+`C:\Users\ACER\Downloads\partytogether\party-together\...` and let it
+replace the existing one.
 
-No game itself is implemented yet - "Who Am I?" is registered in
-`lib/games-registry.ts` as metadata only (name/description/player counts),
-with no board, turn system, or components.
-
-## Stack
-
-- Next.js (App Router) → Vercel
-- Supabase (Postgres + RLS + Realtime + Storage)
-- Cloudflare in front of Vercel (DNS/WAF/rate limiting)
-
-## Getting started (once Phase 1+ lands)
-
-```bash
-npm install
-cp .env.example .env.local   # fill in Supabase project values
-npm run dev
+## After copying
+Run this from inside the `party-together` folder to make sure everything
+still compiles:
 ```
-
-## Project structure
-
+npx tsc --noEmit
 ```
-/app                          Next.js routes (platform core UI)
-/games                        Game plugin modules (self-contained, swappable)
-  /who-am-i
-/lib
-  /supabase                   Supabase client/server/admin helpers
-  /rooms                      Game-agnostic room/lobby core logic
-  /games-registry.ts          Central list of registered games
-/public/characters/who-am-i   Character roster assets (manifest.json + images)
-```
+Then rebuild/redeploy as usual.
 
-Core architecture rule: the platform core (`/app`, `/lib/rooms`) must never
-contain game-specific logic. Adding a new game = a new folder under `/games`
-plus one entry in `/lib/games-registry.ts`.
+## What's new in this round
+- `lib/site.ts` — a small shared `getSiteUrl()` helper (used by the other
+  4 files instead of repeating the domain fallback in each one).
+- `app/games/[game]/page.tsx` — adds JSON-LD structured data to
+  `/games/who-am-i` and `/games/who-are-you`:
+  - `BreadcrumbList` (Home → Games → game) — the structured data type
+    Google supports most reliably for search results.
+  - `VideoGame` entry — name, description, image, player count, genre,
+    free `Offer`, publisher.

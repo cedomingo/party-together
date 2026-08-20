@@ -1,16 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import { PaperBorderAuto } from "./components/PaperBorderAuto";
+import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 // Platform-wide default metadata. Per-game landing pages override this
 // via the Next.js Metadata API using each game's GameConfig (§4 of SPEC.md).
+// `metadataBase` lets every route below use relative URLs in `alternates.
+// canonical` / `openGraph.url` / `openGraph.images` and still resolve to
+// absolute, correctly-domained tags - falls back to the real production
+// origin if the env var isn't set for some reason (matches app/sitemap.ts).
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: {
-    default: "Party Together",
+    default: "Party Together – Free Online Party Games to Play with Friends",
     template: "%s | Party Together",
   },
   description:
-    "Create a room, share the link, and play browser-based party games with friends.",
+    "Play free online multiplayer party games with friends in your browser. No sign-up, no download, and no account required. Create a room and start playing instantly.",
 };
 
 // Explicit rather than relying on Next's default (SPEC.md §11 mobile-first):

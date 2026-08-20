@@ -26,6 +26,26 @@ export interface GameConfig {
   maxPlayers: number;
   /** Path under /public to the thumbnail used in the game picker + OG image */
   thumbnailPath: string;
+    /**
+   * SEO copy for this game's indexable landing page (/games/<id>), separate
+   * from `description` (used in the game picker card, which stays short).
+   * Optional so a new game can ship without it; the landing page falls back
+   * to `displayName`/`description` when omitted.
+   */
+  seo?: {
+    /** <title> - kept distinct from `displayName` so it can carry more SEO intent. */
+    title: string;
+    /** <meta name="description"> */
+    metaDescription: string;
+    /** On-page <h1>, may differ slightly from `title` (no " | Party Together" suffix, etc). */
+    h1: string;
+    /** Intro paragraph rendered under the h1, replacing the shorter `description`. */
+    intro: string;
+    /** Target search phrases, folded into `keywords` metadata. */
+    searchTerms: string[];
+    /** On-page tag chips. */
+    tags: string[];
+  };
   /**
    * Optional game-specific replacement for the platform core's generic
    * `startGame` (lib/rooms), run when the host presses "Start Game". Most
